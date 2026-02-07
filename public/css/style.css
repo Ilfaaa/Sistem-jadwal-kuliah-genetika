@@ -1,0 +1,381 @@
+* {
+    scroll-behavior: smooth;
+}
+
+html{
+    overflow-x: hidden;
+}
+
+table tr td{
+    color: black;
+}
+
+.box-profile {
+    /*height: 100vh;*/
+    background: rgba(0, 0, 0, 0.7) url('/img/wheat.png');
+    background-size: auto;
+    background-attachment: repeat;
+    background-position: center;
+    background-blend-mode: overlay;
+}
+
+.btn-profile {
+    width: 300px;
+    background-color: #00917C;
+    color: #FDE8CD;
+    transition: 0.5s;
+}
+
+.btn-profile:hover {
+    width: 300px;
+    background-color: #025955;
+    color: #FDE8CD;
+}
+
+.btn-greenTheme{
+    background-color: #00917C;
+    color: #FDE8CD;
+    transition: .4s;
+}
+
+.btn-greenTheme:hover{
+    background-color: #025955;
+    color: #FDE8CD;
+
+}
+
+.btn-outline-greenTheme {
+    color: #00917C;
+    border: solid 1px #00917C;
+    transition: .4s;
+}
+
+.btn-outline-greenTheme:hover {
+    background-color: #025955;
+    color: #FDE8CD;
+}
+
+.bg-greenTheme {
+    background-color: #00917C;
+}
+
+.bg-choTheme {
+    background-color: #433520;
+}
+
+.text-whiteTheme {
+    color: #FDE8CD;
+}
+.text-choTheme {
+    color: #433520;
+}
+
+.text-greenTheme {
+    color: #00917C;
+}
+
+.text-detail {
+    font-size: 18px;
+    cursor: pointer;
+    color: #00917C;
+    transition: .4s;
+}
+.text-detail:hover {
+    color: #025955;
+}
+
+.active-text {
+    color: #025955;
+}
+
+.nav-link.active {
+    background-color: #00917C !important;
+    color: #FDE8CD !important;
+}
+
+.rotate-n90d {
+    transform: rotate(-90deg);
+}
+
+.rotate-90d {
+    transform: rotate(90deg);
+}
+
+.genBtn i.fa-dna{
+    transition: 70s;
+}
+.genBtn:hover i.fa-dna {
+    background: -webkit-linear-gradient( rgb(238, 0, 0), rgb(0, 2, 126));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.genBtn:hover{
+    border: solid 1px rgb(80, 0, 146);
+    background: -webkit-linear-gradient( rgb(238, 0, 0), rgb(0, 2, 126));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.genBtnAfter {
+    border: solid 1px rgb(80, 0, 146);
+    background: -webkit-linear-gradient( rgb(238, 0, 0), rgb(0, 2, 126));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.genBtnAfter i.fa-dna {
+    transform: rotate(7200deg);
+    background: -webkit-linear-gradient( rgb(238, 0, 0), rgb(0, 2, 126));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+
+
+
+.nav-treeview-container li a i, .nav-treeview-container li a p, i.fa-angle-left, .opsiLainBtn i.fa-arrow-circle-right {
+    transition: .5s !important;
+}
+
+.nav-treeview-container li a:hover {
+    color: #00917C !important;
+}
+
+i.fa-angle-left {
+    font-size: 20px !important;
+}
+
+i.fa-angle-left.arrow-waktu:hover, i.fa-angle-left.arrow-kuliah:hover {
+    color: #025955 !important; 
+}
+.nav-treeview-container li a:hover i {
+    transform: rotate(90deg);
+}
+
+.nav-item .list-jadwal li:hover {
+    color: #025955 !important; 
+}
+
+ol.breadcrumb li a {
+    color: #00917C;
+    transition: .5s;
+}
+
+ol.breadcrumb li a:hover {
+    color: #025955;
+}
+
+/* form generate */
+
+.generate-detail {
+    cursor: pointer;
+}
+
+.generate-detail:hover {
+    text-decoration: underline;
+}
+
+.detail-container img {
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+}
+
+.detail-container p {
+    text-indent: 30px;
+    font-size: 18px;
+    color: #433520;
+}
+
+.detail-container ul li {
+    font-size: 18px;
+    color: #433520;
+}
+/* switch button styling */
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 24px;
+  }
+  
+  .switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+/* Inisialisasi table */
+
+.inisialisasiTable tbody tr td {
+    font-size: 14px;
+}
+
+  /* Kromosom vetical text */
+
+  .verticalTableHeader {
+    text-align:center;
+    white-space:nowrap;
+    transform: rotate(270deg);
+}
+.verticalTableHeader p {
+    margin:0 -999px;/* virtually reduce space needed on width to very little */
+    display:inline-block;
+}
+.verticalTableHeader p:before {
+    content:'';
+    width:0;
+    /* takes width as reference, + 10% for faking some extra padding */
+    display:inline-block;
+    vertical-align:middle;
+}
+.verticalTableHeader .p-krom:before {
+    padding-top:110%;
+}
+.verticalTableHeader .p-detail:before {
+    padding-top:190%;
+}
+
+table {
+    text-align:center;
+}
+
+/* Request link */
+.requests-link{
+    color: #433520 !important;
+    transition: .4s;
+}
+.requests-link:hover{
+    color: #00917C !important;
+}
+
+/* Slider */
+.slider {
+position: absolute;
+cursor: pointer;
+top: 0;
+left: 0;
+right: 0;
+bottom: 0;
+background-color: #ccc;
+-webkit-transition: .4s;
+transition: .4s;
+}
+
+.slider:before {
+position: absolute;
+content: "";
+height: 18px;
+width: 18px;
+left: 3px;
+bottom: 3px;
+background-color: white;
+-webkit-transition: .4s;
+transition: .4s;
+}
+
+input:checked + .slider {
+background-color: #00917C;
+}
+
+input:focus + .slider {
+box-shadow: 0 0 1px #00917C;
+}
+
+input:checked + .slider:before {
+-webkit-transform: translateX(16px);
+-ms-transform: translateX(16px);
+transform: translateX(16px);
+}
+
+/* scroll styling */
+
+/* width */
+::-webkit-scrollbar {
+	width: 10px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+	box-shadow: inset 0 0 5px grey;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+	background: #433520;
+    border-radius: 20px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+    background: #025955;
+}
+
+/* width */
+.card::-webkit-scrollbar {
+    width: 10px;
+    height: 50px;
+}
+
+/* Track */
+.card::-webkit-scrollbar-track {
+	box-shadow: inset 0 0 5px grey;
+}
+
+/* Handle */
+.card::-webkit-scrollbar-thumb {
+	background: #FDE8CD;
+}
+
+/* Handle on hover */
+.card::-webkit-scrollbar-thumb:hover {
+	background: #025955;
+}
+
+
+
+/* HR Text Styling */
+.hr-text {
+    line-height: 1em;
+    position: relative;
+    outline: 0;
+    border: 0;
+    color: black;
+    text-align: center;
+    height: 1.5em;
+    opacity: .5;
+}
+.hr-text:before {
+    content: '';
+    background: linear-gradient(to right, transparent, black, transparent);
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 1px;
+}
+.hr-text:after {
+    content: attr(data-content);
+    position: relative;
+    display: inline-block;
+    color: black;
+    padding: 0 .5em;
+    line-height: 1.5em;
+    background-color: #f7f7f7;
+}
+
+/* request dosen prioritas */
+div.dosen-request-container div {
+    transition: .5s;
+}
+
+/* error msg */
+.error-msg {
+    font-size: 12px;
+    color: red;
+    font-style: italic;
+}
