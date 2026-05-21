@@ -1,13 +1,14 @@
 <!-- HEADER -->
+@include('layouts.partials.header')
 
-@include('layouts.partials.header');
-@include('layouts.partials.sidebar');
-@include('layouts.partials.navbar');
+@include('layouts.partials.sidebar')
+@include('layouts.partials.navbar')
 
-<main>
-    <!-- Content Wrapper. Contains page content -->
-    <div class="content-wrapper" style="background-color: #FDE8CD; color: #433520;">
+<div class="content-wrapper content-theme">
     @yield('content')
-</main>
+</div>
 
-@include('layouts.partials.footer');
+{{-- PENTING: agar @push('scripts') di halaman-halaman (create/edit dll) KE-RENDER --}}
+@stack('scripts')
+
+@include('layouts.partials.footer')

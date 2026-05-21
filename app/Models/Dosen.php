@@ -8,5 +8,21 @@ use Illuminate\Database\Eloquent\Model;
 class Dosen extends Model
 {
     use HasFactory;
+
     protected $table = "dosen";
+    protected $primaryKey = 'kode_dosen';
+    public $incrementing = false;
+    protected $keyType = 'string';
+
+    protected $fillable = [
+        'kode_dosen',
+        'nama',
+        'nidn',
+        'program_studi',
+    ];
+
+    public function getNamaProperAttribute()
+{
+    return ucwords(strtolower($this->nama));
+}
 }

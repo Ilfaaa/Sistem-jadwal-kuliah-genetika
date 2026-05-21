@@ -8,381 +8,414 @@ use App\Models\Kelas;
 
 class ManagekelasController extends Controller
 {
+    /**
+     * Konsep baru:
+     * - Manage Kelas hanya menyimpan data kelas/rombel, mata kuliah, prodi, tahun ajaran, dan kapasitas.
+     * - Dosen TIDAK lagi disimpan/ditentukan dari Manage Kelas.
+     * - Relasi dosen-matkul-kelas final ditentukan saat Generate Jadwal dan disimpan ke jadwal + jadwal_dosen.
+     */
+
+    private function getKodeMatkulFromKodeKelas($kodeKelas)
+    {
+        return substr($kodeKelas, 0, -1);
+    }
+
+    private function getNamaKelasFromKodeKelas($kodeKelas)
+    {
+        return strtoupper(substr($kodeKelas, -1));
+    }
+
+    private function getIdKelasMatkul($kodeKelas, $tahunAjaran)
+    {
+        $kodeMatkul = $this->getKodeMatkulFromKodeKelas($kodeKelas);
+        $namaKelas = $this->getNamaKelasFromKodeKelas($kodeKelas);
+
+        $kelasMatkul = DB::table('kelas_matkul')
+            ->where('kode_matkul', $kodeMatkul)
+            ->where('nama_kelas', $namaKelas)
+            ->where('tahun_ajaran', $tahunAjaran)
+            ->first();
+
+        return $kelasMatkul ? $kelasMatkul->id_kelas : null;
+    }
+
+    private function labelDosenGenerate()
+    {
+        return 'Ditentukan saat generate jadwal';
+    }
+
+    private function ensureKelasMatkul($kodeKelas, $kelas, $jumlahMahasiswa, $tahunAjaran)
+    {
+        $kodeMatkul = $this->getKodeMatkulFromKodeKelas($kodeKelas);
+        $namaKelas = strtoupper($kelas);
+
+        $matkul = DB::table('matkul')
+            ->where('kode_matkul', $kodeMatkul)
+            ->where('tahun_ajaran', $tahunAjaran)
+            ->first();
+
+        if (!$matkul) {
+            return false;
+        }
+
+        $existing = DB::table('kelas_matkul')
+            ->where('kode_matkul', $kodeMatkul)
+            ->where('nama_kelas', $namaKelas)
+            ->where('tahun_ajaran', $tahunAjaran)
+            ->first();
+
+        if ($existing) {
+            DB::table('kelas_matkul')
+                ->where('id_kelas', $existing->id_kelas)
+                ->update([
+                    'kode_rombel'      => $kodeKelas,
+                    'jumlah_mahasiswa' => $jumlahMahasiswa,
+                    'kode_semester'    => $matkul->kode_semester,
+                    'kode_prodi'       => $matkul->kode_prodi ?? null,
+                    'updated_at'       => now(),
+                ]);
+
+            return true;
+        }
+
+        DB::table('kelas_matkul')->insert([
+            'kode_matkul'      => $kodeMatkul,
+            'nama_kelas'       => $namaKelas,
+            'kode_rombel'      => $kodeKelas,
+            'jumlah_mahasiswa' => $jumlahMahasiswa,
+            'kode_semester'    => $matkul->kode_semester,
+            'tahun_ajaran'     => $tahunAjaran,
+            'kode_prodi'       => $matkul->kode_prodi ?? null,
+            'created_at'       => now(),
+            'updated_at'       => now(),
+        ]);
+
+        return true;
+    }
+
+    private function cleanupRelasiDosenLama($kodeKelas, $tahunAjaran)
+    {
+        // Aman untuk menjaga konsep baru: dosen tidak lagi melekat di Manage Kelas.
+        $idKelas = $this->getIdKelasMatkul($kodeKelas, $tahunAjaran);
+
+        if ($idKelas) {
+            DB::table('kelas_matkul_dosen')
+                ->where('id_kelas', $idKelas)
+                ->delete();
+        }
+
+        DB::table('kuliah')
+            ->where('kode_kelas', $kodeKelas)
+            ->where('tahun_ajaran', $tahunAjaran)
+            ->delete();
+    }
+
     public function index(Request $request)
     {
         $user_login = $request->session()->get('user_login');
-        $countRequest = DB::table('request_kuliah')->count() + DB::table('request_ruang')->count() + DB::table('request_waktu')->count();
-        
-        $request_keyword = "";
-        if($request->keyword){
-            $kelas = DB::table('kelas')->where('nama_matkul', 'LIKE', "%{$request->keyword}%")->orWhere('nama_dosen', 'LIKE', "%{$request->keyword}%")->orWhere('kelas', 'LIKE', "%{$request->keyword}%")->orWhere('kapasitas_kelas', 'LIKE', "%{$request->keyword}%")->get();
-            $request_keyword = $request->keyword;
-        } else {
-            $kelas = DB::table('kelas')->get();
-        }
 
-        // list tahun ajaran yang ada
+        $countRequest =
+            DB::table('request_kuliah')->count() +
+            DB::table('request_ruang')->count() +
+            DB::table('request_waktu')->count();
+
+        $request_keyword = $request->keyword ?? '';
         $tahun_ajaran = DB::table('tahun_ajaran')->get();
-
         $kelasByTahun = [];
-        foreach($tahun_ajaran as $tahun) {
-            array_push($kelasByTahun, [$tahun->tahun_ajaran]);
-        }
-        
-        for ($i=0; $i < count($kelasByTahun); $i++) { 
-            $tempKelas = DB::table('kelas')->where('tahun_ajaran', $kelasByTahun[$i])->get();
-            if ($tempKelas) {
-                array_push($kelasByTahun[$i], $tempKelas);
-            } else {
-                array_push($kelasByTahun[$i], []);
+
+        foreach ($tahun_ajaran as $tahun) {
+            $query = DB::table('kelas')->where('tahun_ajaran', $tahun->tahun_ajaran);
+
+            if ($request_keyword !== '') {
+                $kw = $request_keyword;
+
+                $query->where(function ($q) use ($kw) {
+                    $q->where('kelas.kode_kelas', 'LIKE', "%{$kw}%")
+                        ->orWhere('kelas.nama_matkul', 'LIKE', "%{$kw}%")
+                        ->orWhere('kelas.kelas', 'LIKE', "%{$kw}%")
+                        ->orWhere('kelas.kapasitas_kelas', 'LIKE', "%{$kw}%")
+                        ->orWhere('kelas.nama_dosen', 'LIKE', "%{$kw}%");
+                });
             }
+
+            $tempKelas = $query
+                ->orderBy('kelas.kode_kelas')
+                ->get();
+
+            foreach ($tempKelas as $k) {
+                $k->nama_dosen = $this->labelDosenGenerate();
+            }
+
+            $kelasByTahun[] = [$tahun->tahun_ajaran, $tempKelas];
         }
 
-        return view('managekelas.index', compact('kelas', 'user_login','request_keyword','countRequest','kelasByTahun'));
+        $kelas = DB::table('kelas')->get();
+
+        foreach ($kelas as $k) {
+            $k->nama_dosen = $this->labelDosenGenerate();
+        }
+
+        return view('managekelas.index', compact(
+            'kelas',
+            'user_login',
+            'request_keyword',
+            'countRequest',
+            'kelasByTahun'
+        ));
     }
+
     public function create(Request $request)
     {
         $user_login = $request->session()->get('user_login');
-        $countRequest = DB::table('request_kuliah')->count() + DB::table('request_ruang')->count() + DB::table('request_waktu')->count();
 
-        // list tahun ajaran yang ada
+        $countRequest =
+            DB::table('request_kuliah')->count() +
+            DB::table('request_ruang')->count() +
+            DB::table('request_waktu')->count();
+
         $tahun_ajaran = DB::table('tahun_ajaran')->get();
-        
         $semester = DB::table('semester')->get();
         $matkul = DB::table('matkul')->get();
-        $dosen = DB::table('dosen')->get();
         $prodi = DB::table('prodi')->get();
-        return view('managekelas.create', compact('user_login','semester','prodi','matkul','dosen','countRequest','tahun_ajaran'));
+
+        // Tetap dikirim supaya view lama tidak error. Nanti view create akan kita bersihkan.
+        $dosen = collect();
+
+        return view('managekelas.create', compact(
+            'user_login',
+            'semester',
+            'prodi',
+            'matkul',
+            'dosen',
+            'countRequest',
+            'tahun_ajaran'
+        ));
     }
 
-    public function create_action(Request $request) {
-
-        if($request->ajax()) {
-            if($request->has('prodi')){
-
-                $prodi = $request->get('prodi');
-                $tahun_ajaran = $request->get('tahun_ajaran');
-                $prodi = explode("-",$prodi);
-                
-                $dosenByProdi = DB::table('dosen')->where('program_studi', $prodi[1])->get();
-                $matkulByProdiAndTahunAjaran = DB::table('matkul')->where('kode_prodi', $prodi[0])->where('tahun_ajaran',$tahun_ajaran)->get();
-                
-                $data = array(
-                    'allDosen'  => $dosenByProdi,
-                    'allMatkul'  => $matkulByProdiAndTahunAjaran,
-                );
-                echo json_encode($data);
-            }
-            if($request->has('matkul')){
-
-                $matkul = $request->get('matkul');
-                $tahun_ajaran = $request->get('tahun_ajaran');
-                $matkul = explode("-",$matkul);
-                
-                $kelasByMatkulAndTahunAjaran = DB::table('kelas')->where('nama_matkul', $matkul[1])->where('tahun_ajaran', $tahun_ajaran)->get();
-                
-                $data = array(
-                    'kelas'  => $kelasByMatkulAndTahunAjaran
-                );
-                echo json_encode($data);
-            }
-        } else {
+    public function create_action(Request $request)
+    {
+        if (!$request->ajax()) {
             return redirect('/managekuliah/managekelas/create');
         }
+
+        if ($request->has('prodi')) {
+            $prodi = explode('-', $request->get('prodi'));
+            $tahun_ajaran = $request->get('tahun_ajaran');
+
+            $matkulByProdiAndTahunAjaran = DB::table('matkul')
+                ->where('kode_prodi', $prodi[0])
+                ->where('tahun_ajaran', $tahun_ajaran)
+                ->get();
+
+            return response()->json([
+                'allMatkul' => $matkulByProdiAndTahunAjaran,
+            ]);
+        }
+
+        if ($request->has('matkul')) {
+            $matkul = explode('-', $request->get('matkul'));
+            $tahun_ajaran = $request->get('tahun_ajaran');
+
+            $kelasByMatkulAndTahunAjaran = DB::table('kelas')
+                ->where('nama_matkul', strtolower($matkul[1]))
+                ->where('tahun_ajaran', $tahun_ajaran)
+                ->get();
+
+            return response()->json([
+                'kelas' => $kelasByMatkulAndTahunAjaran
+            ]);
+        }
+
+        return response()->json([]);
     }
-    
 
     public function store(Request $request)
     {
-        
         $request->validate(
             [
-                'prodi' => 'required|min:3|max:255',
-                'matkul' => 'required|min:3|max:255',
-                'dosen_pengajar' => 'required|min:3|max:255',
-                'kelas' => 'required',
+                'tahun_ajaran'    => 'required',
+                'prodi'           => 'required|min:3|max:255',
+                'matkul'          => 'required|min:3|max:255',
+                'kelas'           => 'required',
                 'kapasitas_kelas' => 'required|numeric|min:1|max:100',
             ],
             [
-                'prodi.required' => 'Harap Pilih Program Studi.',
-                'prodi.min' => 'Program Studi minimal 3 huruf.',
-                'prodi.max' => 'Program Studi minimal 255 huruf.',
-                'matkul.required' => 'Harap Pilih Mata Kuliah.',
-                'matkul.min' => 'Mata Kuliah minimal 3 huruf.',
-                'matkul.max' => 'Mata Kuliah minimal 255 huruf.',
-                'dosen_pengajar.required' => 'Harap Pilih Dosen Pengajar.',
-                'dosen_pengajar.min' => 'Nama Dosen minimal 3 huruf.',
-                'dosen_pengajar.max' => 'Nama Dosen minimal 255 huruf.',
+                'tahun_ajaran.required'    => 'Harap pilih Tahun Ajaran.',
+                'prodi.required'           => 'Harap Pilih Program Studi.',
+                'matkul.required'          => 'Harap Pilih Mata Kuliah.',
+                'kelas.required'           => 'Harap Pilih Kelas.',
                 'kapasitas_kelas.required' => 'Harap Pilih Kapasitas Kelas.',
-                'kapasitas_kelas.numeric' => 'Kapasitas Kelas Harus Berupa Angka',
-                'kapasitas_kelas.min' => 'Kapasitas Kelas Minimal 1 Orang',
-                'kapasitas_kelas.max' => 'Kapasitas Kelas maksimal 100 Orang',
-                'kelas.required' => 'Seluruh Kelas Sudah Terpenuhi.',
+                'kapasitas_kelas.numeric'  => 'Kapasitas Kelas Harus Berupa Angka.',
+                'kapasitas_kelas.min'      => 'Kapasitas Kelas Minimal 1 Orang.',
+                'kapasitas_kelas.max'      => 'Kapasitas Kelas maksimal 100 Orang.',
             ]
-            
         );
 
-        // dump($request->all());
+        $prodi = explode('-', $request->prodi);
+        $kodeProdi = $prodi[0];
+        $namaProdi = $prodi[1] ?? '';
 
-        $matkul = explode("-",$request->matkul); // TIF0001 - Basisdata
-
-        // dd($request->all());
-
-        // // Validasi Kelas Exist //
-        
-        // $kelasIsExist = Kelas::where('nama_matkul',$matkul[1])->get();
-
-        // if (count($kelasIsExist) == 0){
-        //     $kelas = 'A';
-        // }
-        // if (count($kelasIsExist) == 1){
-        //     if ($kelasIsExist[0]->kelas == 'A'){
-        //         $kelas = 'B';
-        //     } else {
-        //         $kelas = 'A';
-        //     }
-        // }
-        // if(count($kelasIsExist) == 2) {
-        //     return redirect('/managekuliah/managekelas/create')->with('kelas_exist', "Kelas A dan B pada ".ucwords($matkul[1])." sudah ada!");
-        // } 
-        
-        // // End Validasi Kelas Exist //
-        $kelas = $request->kelas;
+        $matkul = explode('-', $request->matkul);
+        $kodeMatkul = $matkul[0];
+        $namaMatkul = $matkul[1] ?? '';
+        $kelas = strtoupper($request->kelas);
+        $kodeKelas = $kodeMatkul . $kelas;
 
         $user_login = $request->session()->get('user_login');
 
-
-        if ($user_login->role_id != '1'){
-            // INSERT DATA KE TABEL REQUEST KULIAH
+        if ((string) $user_login->role_id !== '1') {
             DB::table('request_kuliah')->insert([
-                'request' => 'Tambah Data',
-                'manage' => 'Kelas',
-                'kode_manage' => $matkul[0].$kelas, // TIF0001A
-                'nama_manage' => strtoupper($kelas), // A
-                'sks' => '',
-                'kode_prodi' => '',
-                'kode_semester'=> $request->tahun_ajaran, //tahun ajaran numpang data di kode_semester
-                'nama_prodi'=> '',
-                'nama_matkul'=> strtolower($matkul[1]), //basisdata
-                'nama_dosen'=> $request->dosen_pengajar,
-                'kapasitas_kelas'=> $request->kapasitas_kelas,
-                'name' => $user_login->name,
-                'image' => $user_login->image,
-                'created_at' => date("Y-m-d h:i:s")
+                'request'         => 'Tambah Data',
+                'manage'          => 'Kelas',
+                'kode_manage'     => $kodeKelas,
+                'nama_manage'     => $kelas,
+                'sks'             => '',
+                'kode_prodi'      => $kodeProdi,
+                'kode_semester'   => $request->tahun_ajaran,
+                'nama_prodi'      => $namaProdi,
+                'nama_matkul'     => strtolower($namaMatkul),
+                'nama_dosen'      => $this->labelDosenGenerate(),
+                'kapasitas_kelas' => $request->kapasitas_kelas,
+                'name'            => $user_login->name,
+                'image'           => $user_login->image,
+                'created_at'      => now(),
             ]);
 
-            // RETURN REDIRECT KE HALAMAN MENU DOSEN
-            return redirect('/managekuliah/managekelas')->with('status', 'Data kelas Berhasil dikirimkan ke admin!');
-
-        } else {  
-        
-            DB::table('kelas')->insert([
-                'kode_kelas' => $matkul[0].$kelas, // TIF0001A
-                'nama_matkul' => strtolower($matkul[1]), // basisdata
-                'nama_dosen' => $request->dosen_pengajar, // rizalul akram
-                'kelas' => strtoupper($kelas), // A
-                'kapasitas_kelas'=> $request->kapasitas_kelas, // 40
-                'tahun_ajaran' => $request->tahun_ajaran, // 2024/2025
-            ]);
-
-            $kuliah = DB::table('kuliah')->where('tahun_ajaran', $request->tahun_ajaran)->get();
-
-            // dump($kuliah);
-
-
-            // insert ke Table Kuliah
-            $kode_kuliah = (count($kuliah) == 0) ? 1 : $kuliah[count($kuliah) - 1]->kode_kuliah + 1;
-
-            $kode_matkul = substr($matkul[0].$kelas, 0, -1);
-
-            $kode_dosen = DB::table('dosen')->where('nama', $request->dosen_pengajar)->first()->kode_dosen;
-
-            $kode_prodi = substr($matkul[0].$kelas, 0, -5);
-
-            $kode_semester = DB::table('matkul')->where('nama_matkul', strtolower($matkul[1]))->where('tahun_ajaran',$request->tahun_ajaran)->first()->kode_semester;
-
-            // dump($kode_kuliah);
-            // dump($kode_matkul);
-            // dump($kode_dosen);
-            // dump($kode_prodi);
-            // dump($kode_semester);
-
-
-
-                DB::table('kuliah')->insert([
-                    'kode_kuliah' => $kode_kuliah, // 1
-                    'kode_matkul' => $kode_matkul, //TIF0001
-                    'kode_dosen' => $kode_dosen, //TIF001
-                    'kode_kelas' => $matkul[0].$kelas, //TIF0001A
-                    'kode_prodi' => $kode_prodi, // TIF
-                    'kode_semester' => $kode_semester, // 2
-                    'tahun_ajaran' => $request->tahun_ajaran, //2023/2025
-                ]);
-
-            $kuliah = DB::table('kuliah')->where('tahun_ajaran', $request->tahun_ajaran)->get();
-
-                // dd($kuliah);
-            
-
-                if($kuliah[count($kuliah) - 1]->kode_kuliah != count($kuliah)) {
-                    for ($i=0; $i < count($kuliah); $i++) { 
-                        DB::table('kuliah')
-                        ->where('kode_kuliah', $kuliah[$i]->kode_kuliah)
-                        ->where('tahun_ajaran', $request->tahun_ajaran)
-                        ->update([
-                            'kode_kuliah' => $i+1,
-                        ]);
-                    }
-                }
-            return redirect('/managekuliah/managekelas')->with('status', 'Data kelas Berhasil Ditambahkan!');
+            return redirect('/managekuliah/managekelas')
+                ->with('status', 'Data kelas berhasil dikirimkan ke admin. Dosen akan ditentukan saat generate jadwal.');
         }
+
+        $existingKelas = DB::table('kelas')
+            ->where('kode_kelas', $kodeKelas)
+            ->where('tahun_ajaran', $request->tahun_ajaran)
+            ->first();
+
+        if ($existingKelas) {
+            return redirect()->back()
+                ->withInput()
+                ->with('kelas_exist', 'Data kelas tersebut sudah ada pada tahun ajaran yang dipilih.');
+        }
+
+        DB::table('kelas')->insert([
+            'kode_kelas'      => $kodeKelas,
+            'nama_matkul'     => strtolower($namaMatkul),
+            'nama_dosen'      => $this->labelDosenGenerate(),
+            'kelas'           => $kelas,
+            'kapasitas_kelas' => $request->kapasitas_kelas,
+            'tahun_ajaran'    => $request->tahun_ajaran,
+        ]);
+
+        $this->ensureKelasMatkul($kodeKelas, $kelas, $request->kapasitas_kelas, $request->tahun_ajaran);
+        $this->cleanupRelasiDosenLama($kodeKelas, $request->tahun_ajaran);
+
+        return redirect('/managekuliah/managekelas')
+            ->with('status', 'Data kelas berhasil ditambahkan. Dosen pengajar akan ditentukan otomatis saat generate jadwal.');
     }
 
     public function edit(Request $request, $kode_kelas, $tahun_ajaran)
     {
         $user_login = $request->session()->get('user_login');
-        $countRequest = DB::table('request_kuliah')->count() + DB::table('request_ruang')->count() + DB::table('request_waktu')->count();
 
-        $tahun_ajaran_temp = explode('-', $tahun_ajaran); 
-        $tahun_ajaran = implode('/',$tahun_ajaran_temp);
-        
-        $kelas = DB::table('kelas')->where('kode_kelas',$kode_kelas)->where('tahun_ajaran', $tahun_ajaran)->first();
+        $countRequest =
+            DB::table('request_kuliah')->count() +
+            DB::table('request_ruang')->count() +
+            DB::table('request_waktu')->count();
 
-        $currentDosen = $kelas->nama_dosen;
-        $dosenProdi = DB::table('dosen')->where('nama',$currentDosen)->first();
-        $allDosenByProdi = DB::table('dosen')->where('program_studi',$dosenProdi->program_studi)->get();
+        $tahun_ajaran_db = str_replace('-', '/', $tahun_ajaran);
 
-        $tahun_ajaran_temp = explode('/', $tahun_ajaran); 
-        $tahun_ajaran = implode('-',$tahun_ajaran_temp);
+        $kelas = DB::table('kelas')
+            ->where('kode_kelas', $kode_kelas)
+            ->where('tahun_ajaran', $tahun_ajaran_db)
+            ->first();
 
-        return view('managekelas.edit', compact('user_login', 'kelas','allDosenByProdi','countRequest','tahun_ajaran'));
+        if (!$kelas) {
+            return redirect('/managekuliah/managekelas')->with('status', 'Data kelas tidak ditemukan!');
+        }
+
+        $kelas->nama_dosen = $this->labelDosenGenerate();
+
+        // Tetap dikirim supaya view edit lama tidak error. Nanti view edit akan kita bersihkan.
+        $selectedDosen = [];
+        $allDosenByProdi = collect();
+        $tahun_ajaran = str_replace('/', '-', $tahun_ajaran_db);
+
+        return view('managekelas.edit', compact(
+            'user_login',
+            'kelas',
+            'allDosenByProdi',
+            'selectedDosen',
+            'countRequest',
+            'tahun_ajaran'
+        ));
     }
 
     public function update(Request $request, $kode_kelas, $tahun_ajaran)
     {
-
-
         $request->validate(
             [
-
-                'dosen_pengajar' => 'required|min:3|max:255',
                 'kapasitas_kelas' => 'required|numeric|min:1|max:100',
             ],
             [
-                'dosen_pengajar.required' => 'Harap Pilih Dosen Pengajar.',
-                'dosen_pengajar.min' => 'Nama Dosen minimal 3 huruf.',
-                'dosen_pengajar.max' => 'Nama Dosen minimal 255 huruf.',
                 'kapasitas_kelas.required' => 'Harap Pilih Kapasitas Kelas.',
-                'kapasitas_kelas.numeric' => 'Kapasitas Kelas Harus Berupa Angka',
-                'kapasitas_kelas.min' => 'Kapasitas Kelas Minimal 1 Orang',
-                'kapasitas_kelas.max' => 'Kapasitas Kelas maksimal 100 Orang',
+                'kapasitas_kelas.numeric'  => 'Kapasitas Kelas Harus Berupa Angka.',
+                'kapasitas_kelas.min'      => 'Kapasitas Kelas Minimal 1 Orang.',
+                'kapasitas_kelas.max'      => 'Kapasitas Kelas maksimal 100 Orang.',
             ]
-            
         );
 
-        $tahun_ajaran_temp = explode('-', $tahun_ajaran); 
-        $tahun_ajaran = implode('/',$tahun_ajaran_temp);
+        $tahun_ajaran_db = str_replace('-', '/', $tahun_ajaran);
 
-        $kelas = Kelas::where('kode_kelas', $kode_kelas)->where('tahun_ajaran', $tahun_ajaran)->first();
+        $kelas = Kelas::where('kode_kelas', $kode_kelas)
+            ->where('tahun_ajaran', $tahun_ajaran_db)
+            ->first();
 
-        $user_login = $request->session()->get('user_login');
-
-        if ($user_login->role_id != '1'){
-            // INSERT DATA KE TABEL REQUEST KULIAH
-            DB::table('request_kuliah')->insert([
-                'request' => 'Ubah Data',
-                'manage' => 'Kelas',
-                'kode_manage' => $kode_kelas,
-                'nama_manage' => $kelas->kelas,
-                'sks' => '',
-                'kode_prodi' => '',
-                'kode_semester'=> $tahun_ajaran, // numpang tahun ajaran di kode_semester
-                'nama_prodi'=> strtolower($request->program_studi),
-                'nama_matkul'=> $kelas->nama_matkul,
-                'nama_dosen'=> $request->dosen_pengajar,
-                'kapasitas_kelas'=> $request->kapasitas_kelas,
-                'name' => $user_login->name,
-                'image' => $user_login->image,
-                'created_at' => date("Y-m-d h:i:s")
-            ]);
-
-            // RETURN REDIRECT KE HALAMAN MENU MATKUL
-            return redirect('/managekuliah/managekelas')->with('status', 'Perubahan Berhasil diajukan ke admin!');
-
-        } else { 
-
-            DB::table('kelas')
-            ->where('kode_kelas', $kode_kelas)
-            ->where('tahun_ajaran', $tahun_ajaran)
-            ->update([
-                'nama_dosen' => $request->dosen_pengajar,
-                'kapasitas_kelas'=> $request->kapasitas_kelas,
-            ]);
-
-            $kode_dosen = DB::table('dosen')->where('nama', $request->dosen_pengajar)->first()->kode_dosen;
-
-            DB::table('kuliah')
-            ->where('kode_kelas', $kode_kelas)
-            ->where('tahun_ajaran', $tahun_ajaran)
-            ->update([
-                'kode_dosen' => $kode_dosen,
-            ]);
-
-            DB::table('jadwal')
-            ->where('matkul', $kelas->nama_matkul)
-            ->where('kelas', $kelas->kelas)
-            ->where('tahun_ajaran', $tahun_ajaran)
-            ->update([
-                'dosen' => $request->dosen_pengajar
-            ]);
-
-            return redirect('/managekuliah/managekelas')->with('status', 'Data kelas berhasil diubah');
-
+        if (!$kelas) {
+            return redirect('/managekuliah/managekelas')->with('status', 'Data kelas tidak ditemukan!');
         }
+
+        DB::table('kelas')
+            ->where('kode_kelas', $kode_kelas)
+            ->where('tahun_ajaran', $tahun_ajaran_db)
+            ->update([
+                'nama_dosen'      => $this->labelDosenGenerate(),
+                'kapasitas_kelas' => $request->kapasitas_kelas,
+            ]);
+
+        $this->ensureKelasMatkul($kode_kelas, $kelas->kelas, $request->kapasitas_kelas, $tahun_ajaran_db);
+        $this->cleanupRelasiDosenLama($kode_kelas, $tahun_ajaran_db);
+
+        return redirect('/managekuliah/managekelas')
+            ->with('status', 'Data kelas berhasil diubah. Dosen pengajar akan ditentukan saat generate jadwal.');
     }
 
-
-    public function destroy($kode_kelas, Request $request, $tahun_ajaran)
+    public function destroy(Request $request, $kode_kelas, $tahun_ajaran)
     {
-        $user_login = $request->session()->get('user_login');
+        $tahun_ajaran_db = str_replace('-', '/', $tahun_ajaran);
 
-        $tahun_ajaran_temp = explode('-', $tahun_ajaran); 
-        $tahun_ajaran = implode('/',$tahun_ajaran_temp);
+        $kelas = Kelas::where('kode_kelas', $kode_kelas)
+            ->where('tahun_ajaran', $tahun_ajaran_db)
+            ->first();
 
-        $all_kelas = DB::table('kelas')->where('tahun_ajaran',$tahun_ajaran)->get();
-
-        if(count($all_kelas) == 1) {
-            return redirect('managekuliah/managekelas')->with('status', 'Minimal Tersisa Satu Kelas!');
+        if (!$kelas) {
+            return redirect('/managekuliah/managekelas')->with('status', 'Data kelas tidak ditemukan!');
         }
 
-        // Ambil data sebelum di delete
-        $kelas = Kelas::where('kode_kelas',$kode_kelas)->where('tahun_ajaran',$tahun_ajaran)->first();
+        $idKelas = $this->getIdKelasMatkul($kode_kelas, $tahun_ajaran_db);
 
-        if ($user_login->role_id != '1'){
-            // INSERT DATA KE TABEL REQUEST DOSEN
-            DB::table('request_kuliah')->insert([
-                'request' => 'Hapus Data',
-                'manage' => 'Kelas',
-                'kode_manage' => $kode_kelas,
-                'nama_manage' => $kelas->kelas,
-                'sks' => '',
-                'kode_prodi' => '',
-                'kode_semester'=> $tahun_ajaran, // numpang tahun_ajaran di kode_semester
-                'nama_prodi'=> '',
-                'nama_matkul'=> $kelas->nama_matkul,
-                'nama_dosen'=> $kelas->nama_dosen,
-                'kapasitas_kelas'=> $kelas->kapasitas_kelas,
-                'name' => $user_login->name,
-                'image' => $user_login->image,
-                'created_at' => date("Y-m-d h:i:s")
-            ]);
-
-            // RETURN REDIRECT KE HALAMAN MENU MATKUL
-            return redirect('/managekuliah/managekelas')->with('status', 'Hapus Data Berhasil diajukan ke admin!');
+        if ($idKelas) {
+            DB::table('kelas_matkul_dosen')->where('id_kelas', $idKelas)->delete();
+            DB::table('kelas_matkul')->where('id_kelas', $idKelas)->delete();
         }
 
-        DB::table('kelas')->where('kode_kelas', $kode_kelas)->where('tahun_ajaran',$tahun_ajaran)->delete();
-        DB::table('kuliah')->where('kode_kelas', $kode_kelas)->where('tahun_ajaran',$tahun_ajaran)->delete();
+        DB::table('kelas')
+            ->where('kode_kelas', $kode_kelas)
+            ->where('tahun_ajaran', $tahun_ajaran_db)
+            ->delete();
+
+        DB::table('kuliah')
+            ->where('kode_kelas', $kode_kelas)
+            ->where('tahun_ajaran', $tahun_ajaran_db)
+            ->delete();
 
         return redirect('/managekuliah/managekelas')->with('status', 'Data kelas berhasil dihapus!');
     }

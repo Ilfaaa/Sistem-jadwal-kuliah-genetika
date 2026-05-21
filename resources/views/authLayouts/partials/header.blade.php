@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="{{ asset('/AdminLTE/plugins/fontawesome-free/css/all.min.css')}}">
     <link rel="stylesheet" href="{{ asset('/css/authStyle.css')}}">
-    <title>FKOM UNIKU | Sistem Penjadwalan Kuliah</title>
+    <title>SIJATOM</title>
   </head>
   <body>
 

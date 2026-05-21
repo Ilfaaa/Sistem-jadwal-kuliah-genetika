@@ -24,9 +24,9 @@
     <div class="signin-signup">
       <form action="/login" method="post" class="sign-in-form">
         @csrf
-        <img src="{{ asset('/img/logo-unsam.png')}}" alt="Unsam Logo" class="logo-image img-circle">
+        <img src="{{ asset('/img/logo-sijatom.png')}}" alt="Sijatom Logo" class="logo-image img-circle">
         <h2 class="title">Login Form</h2>
-        <div class="input-field @error('emailAtauUsername')) borderError @enderror">
+        <div class="input-field @error('emailAtauUsername') borderError @enderror">
           <i class="fas fa-user"></i>
           <input type="text" name="emailAtauUsername" placeholder="Email Atau Username" value="{{ old('emailAtauUsername') }}" />
         </div>
@@ -40,7 +40,7 @@
       
       <form action="/register" method="post" class="sign-up-form">
         @csrf
-        <img src="{{ asset('/img/logo-unsam.png')}}" alt="Unsam Logo" class="logo-image img-circle">
+        <img src="{{ asset('/img/logo-sijatom.png')}}" alt="Sijatom Logo" class="logo-image img-circle">
         <h2 class="title">Register Form</h2>
         
         <div class="input-field @error('nama') borderError @enderror">
