@@ -18,15 +18,41 @@
         // Shapes: Triangle, Square, Circle. Triangle is weighted higher (50% probability) to replace the lines/crosses.
         const shapes = ['ps-triangle', 'ps-triangle', 'ps-square', 'ps-circle'];
         const animations = ['psFloat1', 'psFloat2', 'psFloat3', 'psFloat4'];
-        const count = 32; // Plenty of beautiful random ornaments
+        
+        const placed = [];
+        const count = 28; // Optimized count of beautiful random ornaments
+        const minDistance = 10; // 10% distance threshold prevents any overlaps
         
         for (let i = 0; i < count; i++) {
+            let top, left;
+            let attempts = 0;
+            let valid = false;
+            
+            // Try to find a non-overlapping spot
+            while (!valid && attempts < 300) {
+                top = Math.random() * 88 + 5; // 5% to 93%
+                left = Math.random() * 88 + 5; // 5% to 93%
+                attempts++;
+                
+                valid = true;
+                for (const pos of placed) {
+                    const dx = pos.left - left;
+                    const dy = pos.top - top;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < minDistance) {
+                        valid = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (!valid) continue; // Skip if no valid spot found
+            
+            placed.push({ top, left });
+            
             const container = document.createElement('div');
             container.className = 'bg-ornament-container';
             
-            // Generate truly random positions (using left/top percentages)
-            const top = Math.random() * 92 + 3; // 3% to 95%
-            const left = Math.random() * 92 + 3; // 3% to 95%
             const rotate = Math.random() * 360;
             const scale = 0.75 + Math.random() * 0.45; // size variation: 0.75x to 1.2x
             
