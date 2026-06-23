@@ -46,7 +46,14 @@ class ManagematkulController extends Controller
             $matkulByTahun[$i][] = $tempMatkul ? $tempMatkul : [];
         }
 
-        return view('managematkul.index', compact('user_login','countRequest','matkulByTahun','dosenPengampuMap'));
+        // Preload data semester untuk filter ganjil/genap
+        $allSemester = DB::table('semester')->get();
+        $semesterByKode = [];
+        foreach ($allSemester as $s) {
+            $semesterByKode[$s->kode_semester] = $s;
+        }
+
+        return view('managematkul.index', compact('user_login','countRequest','matkulByTahun','dosenPengampuMap','semesterByKode'));
     }
 
     public function create(Request $request)
@@ -77,6 +84,7 @@ class ManagematkulController extends Controller
                 'perkuliahan_semester' => 'required|integer|min:1|max:8',
                 'tahun_ajaran' => 'required',
                 'jenis_matkul' => 'required|in:teori,praktikum',
+                'tipe_matkul' => 'required|in:wajib,pilihan',
             ],
             [
                 'nama_matkul.required' => 'Kolom nama matkul harap di isi.',
@@ -93,6 +101,8 @@ class ManagematkulController extends Controller
                 'tahun_ajaran.required' => 'Harap pilih salah satu tahun ajaran.',
                 'jenis_matkul.required' => 'Harap pilih jenis mata kuliah.',
                 'jenis_matkul.in' => 'Jenis mata kuliah harus Teori atau Praktikum.',
+                'tipe_matkul.required' => 'Harap pilih tipe mata kuliah.',
+                'tipe_matkul.in' => 'Tipe mata kuliah harus Wajib atau Pilihan.',
             ]
         );
         // END VALIDASI
@@ -191,7 +201,7 @@ if ($isGanjil && ($perkuliahan % 2 !== 1)) {
                 'nama_manage' => strtolower($request->nama_matkul),
                 'sks' => $request->jumlah_sks,
                 'kode_prodi' => $request->program_studi,
-                'kode_semester' => $request->semester . ':' . $request->perkuliahan_semester . ':' . $request->tahun_ajaran,
+                'kode_semester' => $request->semester . ':' . $request->perkuliahan_semester . ':' . $request->tahun_ajaran . ':' . $request->jenis_matkul . ':' . $request->tipe_matkul,
                 'nama_prodi' => '',
                 'nama_matkul' => '',
                 'nama_dosen' => '',
@@ -209,6 +219,7 @@ if ($isGanjil && ($perkuliahan % 2 !== 1)) {
             $matkulModel->nama_matkul = strtolower($request->nama_matkul);
             $matkulModel->sks = $request->jumlah_sks;
             $matkulModel->jenis_matkul = $request->jenis_matkul;
+            $matkulModel->tipe_matkul = $request->tipe_matkul;
             $matkulModel->kode_prodi = $request->program_studi;
             $matkulModel->kode_semester = $request->semester;
             $matkulModel->perkuliahan_semester = $request->perkuliahan_semester;
@@ -270,6 +281,7 @@ if ($isGanjil && ($perkuliahan % 2 !== 1)) {
                 'periode_semester' => 'required',
                 'perkuliahan_semester' => 'required',
                 'jenis_matkul' => 'required|in:teori,praktikum',
+                'tipe_matkul' => 'required|in:wajib,pilihan',
             ],
             [
                 'nama_matkul.required' => 'Kolom nama matkul harap di isi.',
@@ -281,6 +293,8 @@ if ($isGanjil && ($perkuliahan % 2 !== 1)) {
                 'perkuliahan_semester.required' => 'Harap pilih Semester Perkuliahan.',
                 'jenis_matkul.required' => 'Harap pilih jenis mata kuliah.',
                 'jenis_matkul.in' => 'Jenis mata kuliah harus Teori atau Praktikum.',
+                'tipe_matkul.required' => 'Harap pilih tipe mata kuliah.',
+                'tipe_matkul.in' => 'Tipe mata kuliah harus Wajib atau Pilihan.',
             ]
         );
         //END VALIDASI
@@ -299,7 +313,7 @@ if ($isGanjil && ($perkuliahan % 2 !== 1)) {
                 'nama_manage' => strtolower($request->nama_matkul),
                 'sks' => $request->jumlah_sks,
                 'kode_prodi' => $matkul_old->kode_prodi,
-                'kode_semester' => $request->periode_semester . ':' . $request->perkuliahan_semester . ':' . $tahun_ajaran,
+                'kode_semester' => $request->periode_semester . ':' . $request->perkuliahan_semester . ':' . $tahun_ajaran . ':' . $request->jenis_matkul . ':' . $request->tipe_matkul,
                 'nama_prodi' => '',
                 'nama_matkul' => '',
                 'nama_dosen' => '',
@@ -318,6 +332,7 @@ if ($isGanjil && ($perkuliahan % 2 !== 1)) {
                     'nama_matkul' => strtolower($request->nama_matkul),
                     'sks' => $request->jumlah_sks,
                     'jenis_matkul' => $request->jenis_matkul,
+                    'tipe_matkul' => $request->tipe_matkul,
                     'kode_semester' => $request->periode_semester,
                     'perkuliahan_semester' => $request->perkuliahan_semester,
                 ]);

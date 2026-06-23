@@ -1,6 +1,10 @@
 @extends('layouts.app')
 
-@section('title','Manage Dosen | Sistem Penjadwalan Kuliah')
+@php
+  $isAdminOrDosen = session('user_login') && in_array(session('user_login')->role_id, [1, 2]);
+@endphp
+
+@section('title', $isAdminOrDosen ? 'Manage Dosen | Sistem Penjadwalan Kuliah' : 'Daftar Dosen | Sistem Penjadwalan Kuliah')
 
 @section('content')
 <input type="hidden" name="has_search" class="has_search" value="{{ $request_keyword == "" ? "" : $request_keyword }}">
@@ -10,7 +14,7 @@
   <div class="container-fluid">
     <div class="row mb-2">
       <div class="col-sm-6">
-        <h1 class="m-0">Manage Dosen</h1>
+        <h1 class="m-0">{{ $isAdminOrDosen ? 'Manage Dosen' : 'Daftar Dosen' }}</h1>
       </div><!-- /.col -->
       <div class="col-sm-6">
         <ol class="breadcrumb float-sm-right">
@@ -18,9 +22,9 @@
             <a href="/home/dashboard"><i class="fas fa-igloo mr-2"></i>Home</a>
           </li>
           <li class="breadcrumb-item">
-            <a href="/managekuliah">Manage Kuliah</a>
+            <a href="/managekuliah">{{ $isAdminOrDosen ? 'Manage Kuliah' : 'Informasi Dosen' }}</a>
           </li>
-          <li class="breadcrumb-item active">Manage Dosen</li>
+          <li class="breadcrumb-item active">{{ $isAdminOrDosen ? 'Manage Dosen' : 'Daftar Dosen' }}</li>
         </ol>
       </div><!-- /.col -->
     </div><!-- /.row -->
@@ -45,9 +49,11 @@
       </div>
     </div>
 
+    @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
     <a href="/managekuliah/managedosen/create" class="btn btn-outline-greenTheme mb-2">
       <i class="fas fa-user-plus mr-1"></i>Tambah Data Dosen
     </a>
+    @endif
 
     <div class="row">
       <div class="col-12">
@@ -82,13 +88,20 @@
                   <th scope="col">NIDN / NIP</th>
                   <th scope="col">Nama</th>
                   <th scope="col">Program Studi</th>
+                  @if($isAdminOrDosen)
+                  <th scope="col">No. WhatsApp</th>
+                  @else
+                  <th scope="col">Email</th>
+                  @endif
+                  @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
                   <th scope="col">Action</th>
+                  @endif
                 </tr>
               </thead>
               <tbody>
                 @if(count($dosen) == 0)
                   <tr>
-                    <td scope="row" colspan="6" class="text-center text-bold text-danger">
+                    <td scope="row" colspan="7" class="text-center text-bold text-danger">
                       Dosen Not Found!
                     </td>
                   </tr>
@@ -102,9 +115,37 @@
                     <td scope="row">{{ ucwords($d->nama) }}</td>
                     <td scope="row">{{ ucwords($d->program_studi) }}</td>
                     <td scope="row">
+                      @if($isAdminOrDosen)
+                        @if($d->no_whatsapp)
+                          <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $d->no_whatsapp) }}" target="_blank" class="text-success">
+                            <i class="fab fa-whatsapp"></i> {{ $d->no_whatsapp }}
+                          </a>
+                        @else
+                          <span class="text-muted">-</span>
+                        @endif
+                      @else
+                        @php
+                          $dosenUser = \DB::table('users')
+                            ->where('role_id', 2)
+                            ->where(function($q) use ($d) {
+                              $q->where('username', $d->kode_dosen)
+                                ->orWhere('username', $d->nidn)
+                                ->orWhere('name', $d->nama);
+                            })
+                            ->first();
+                        @endphp
+                        @if($dosenUser && $dosenUser->email)
+                          <a href="mailto:{{ $dosenUser->email }}">{{ $dosenUser->email }}</a>
+                        @else
+                          <span class="text-muted">-</span>
+                        @endif
+                      @endif
+                    </td>
+                    @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
+                    <td scope="row">
                       <form action="/managekuliah/managedosen/{{ $d->kode_dosen }}/edit" method="get" class="d-inline">
-                        <button type="submit" class="badge bg-lime">
-                          <i class="fas fa-user-edit"></i>&nbsp;edit
+                        <button type="submit" class="badge badge-editTheme">
+                          <i class="fas fa-user-edit"></i>&nbsp;ubah
                         </button>
                       </form>
 
@@ -116,6 +157,7 @@
                         </button>
                       </form>
                     </td>
+                    @endif
                   </tr>
                 @endforeach
 

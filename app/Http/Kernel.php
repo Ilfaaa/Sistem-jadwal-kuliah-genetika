@@ -66,5 +66,7 @@ class Kernel extends HttpKernel
         'CheckLoginMiddleware' => \App\Http\Middleware\CheckLoginMiddleware::class,
         'CheckLogoutMiddleware' => \App\Http\Middleware\CheckLogoutMiddleware::class,
         'CheckAdminMiddleware' => \App\Http\Middleware\CheckAdminMiddleware::class,
+        'api.admin' => \App\Http\Middleware\ApiAdminMiddleware::class,
+        'CheckNotMahasiswaMiddleware' => \App\Http\Middleware\CheckNotMahasiswaMiddleware::class,
     ];
 }

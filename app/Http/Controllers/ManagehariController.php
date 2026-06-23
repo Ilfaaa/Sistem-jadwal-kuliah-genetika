@@ -19,7 +19,7 @@ class ManagehariController extends Controller
         } else {
             $hari = DB::table('hari')->get();
         }
-        return view('managehari.index', compact('hari', 'user_login','request_keyword','countRequest'));
+        return view('managehari.index', compact('hari', 'user_login', 'request_keyword', 'countRequest'));
     }
     public function create(Request $request)
     {
@@ -70,7 +70,7 @@ class ManagehariController extends Controller
             ]);
 
             // RETURN REDIRECT KE HALAMAN MENU MATKUL
-            return redirect('/managewaktu/managehari')->with('status', 'Tambah Data Berhasil diajukan ke admin!');
+            return redirect('/managehari')->with('status', 'Tambah Data Berhasil diajukan ke admin!');
         }
 
         DB::table('hari')->insert([
@@ -78,7 +78,9 @@ class ManagehariController extends Controller
             'nama_hari' => strtolower($request->nama_hari),
         ]);
 
-        return redirect('/managewaktu/managehari')->with('status', 'Data hari Berhasil Ditambahkan!');
+        // waktu/jam tables removed — no need to populate waktu entries
+
+        return redirect('/managehari')->with('status', 'Data hari Berhasil Ditambahkan!');
     }
 
     public function destroy(Request $request, $kode_hari)
@@ -88,7 +90,7 @@ class ManagehariController extends Controller
         $all_hari = DB::table('hari')->get();
 
         if(count($all_hari) == 1) {
-            return redirect('managewaktu/managehari')->with('status', 'Minimal Tersisa Satu Hari!');
+            return redirect('managehari')->with('status', 'Minimal Tersisa Satu Hari!');
         }
 
         $hari = DB::table('hari')->where('kode_hari', $kode_hari)->first();
@@ -109,12 +111,12 @@ class ManagehariController extends Controller
             ]);
 
             // RETURN REDIRECT KE HALAMAN MENU MATKUL
-            return redirect('/managewaktu/managehari')->with('status', 'Hapus Data Berhasil diajukan ke admin!');
+            return redirect('/managehari')->with('status', 'Hapus Data Berhasil diajukan ke admin!');
         }
         
         DB::table('hari')->where('kode_hari', $kode_hari)->delete();
-        DB::table('waktu')->where('kode_hari', $kode_hari)->delete();
+        // waktu table removed — nothing to cascade delete
 
-        return redirect('/managewaktu/managehari')->with('status', 'Data hari berhasil dihapus!');
+        return redirect('/managehari')->with('status', 'Data hari berhasil dihapus!');
     }
 }

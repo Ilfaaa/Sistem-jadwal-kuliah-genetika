@@ -132,6 +132,11 @@ class ManageTahunAjaranController extends Controller
                         $dataInsert['jenis_matkul'] = $m->jenis_matkul;
                     }
 
+                    // Salin kolom tipe_matkul jika ada
+                    if (isset($m->tipe_matkul)) {
+                        $dataInsert['tipe_matkul'] = $m->tipe_matkul;
+                    }
+
                     DB::table('matkul')->insert($dataInsert);
                     $jumlahDisalin++;
                 }

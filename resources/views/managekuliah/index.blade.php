@@ -40,13 +40,34 @@
       </div>
     </div>
 
+    @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
     <a href="/managekuliah/managekelas/create" class="btn btn-outline-greenTheme mb-2">
       <i class="fas fa-plus-circle mr-1"></i>Tambah Data Kelas
     </a>
+    @endif
+
+    {{-- FILTER TAHUN AJARAN (seperti Dashboard) --}}
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-body">
+            <div class="form-group mb-0">
+              <label>Tahun Ajaran</label>
+              <select name="filter-tahun-kuliah" id="filter-tahun-kuliah" class="form-control select2bs4" style="width: 100%;">
+                <option value="">-- Silahkan pilih Tahun Ajaran --</option>
+                @foreach($kuliahByTahun as $kuliah)
+                  <option value="{{ $kuliah['tahun_ajaran'] }}">{{ $kuliah['tahun_ajaran'] }}</option>
+                @endforeach
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     {{-- TABEL KULIAH PER TAHUN AJARAN --}}
     @foreach($kuliahByTahun as $kuliah)
-      <div class="row">
+      <div class="row kuliah-tahun-card" data-tahun="{{ $kuliah['tahun_ajaran'] }}" style="display: none;">
         <div class="col-12">
           <div class="card text-choTheme">
             <div class="card-header bg-greenTheme">
@@ -86,7 +107,9 @@
                     <tr>
                       <td scope="row">{{ $k->kode_kuliah }}</td>
                       <td scope="row">{{ $k->kode_matkul }}</td>
-                      <td scope="row">{{ $k->kode_dosen }}</td>
+                      <td scope="row">
+                        <span class="class-dosen-badge" data-kode="{{ $k->kode_dosen }}">{{ $k->kode_dosen }}</span>
+                      </td>
                       <td scope="row">{{ $k->kode_kelas }}</td>
                       <td scope="row">{{ $k->kode_semester }}</td>
                       <td scope="row">
@@ -214,3 +237,23 @@
   </div><!-- /.container-fluid -->
 </section><!-- /.content -->
 @endsection
+
+@push('scripts')
+<script>
+  $(function () {
+    // Filter tabel kuliah berdasarkan tahun ajaran yang dipilih
+    $('#filter-tahun-kuliah').on('change', function () {
+      var selected = $(this).val();
+
+      if (selected === '' || selected === null) {
+        // Sembunyikan semua card jika tidak ada yang dipilih
+        $('.kuliah-tahun-card').slideUp(300);
+      } else {
+        // Sembunyikan semua, lalu tampilkan yang sesuai
+        $('.kuliah-tahun-card').slideUp(300);
+        $('.kuliah-tahun-card[data-tahun="' + selected + '"]').slideDown(300);
+      }
+    });
+  });
+</script>
+@endpush

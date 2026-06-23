@@ -46,7 +46,7 @@ class AuthController extends Controller
             'created_at' => now()
         ]);
 
-        return redirect('/')->with('message', 'Berhasil Registrasi, tunggu persetujuan admin!');
+        return redirect('/login')->with('message', 'Berhasil Registrasi, tunggu persetujuan admin!');
     }
 
 
@@ -73,7 +73,7 @@ class AuthController extends Controller
 
         if ($data) {
             if($data->is_active == '2'){
-                return redirect('/')->with('messageLogin','Akun Tidak Aktif, Silahkan Hubungi Admin.');
+                return redirect('/login')->with('messageLogin','Akun Tidak Aktif, Silahkan Hubungi Admin.');
             }
             if (Hash::check($request->passwordLogin,$data->password)){
                 $request->session()->regenerate();
@@ -82,12 +82,12 @@ class AuthController extends Controller
             } 
         }
 
-        return redirect('/')->with('messageLogin','Gagal Login!');
+        return redirect('/login')->with('messageLogin','Gagal Login!');
 
     }
 
     public function logout(Request $request){
         $request->session()->flush();
-        return redirect('/');
+        return redirect('/login');
     }
 }

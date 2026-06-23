@@ -53,10 +53,98 @@
     text-align: left;
     line-height: 1.35;
     box-shadow: 0 1px 2px rgba(0, 0, 0, .03);
+    border-left: 4px solid #d9e2ef;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .jadwal-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, .08);
   }
 
   .jadwal-item:last-child {
     margin-bottom: 0;
+  }
+
+  /* === Warna berdasarkan tipe mata kuliah === */
+  .jadwal-item-wajib {
+    background: #BFDBFE;
+    border-left-color: #3b82f6;
+    border-color: #93c5fd;
+  }
+  .jadwal-item-wajib .jadwal-matkul {
+    color: #1e3a5f;
+  }
+  .jadwal-item-wajib .jadwal-dosen {
+    color: #1d4ed8;
+  }
+
+  .jadwal-item-pilihan {
+    background: #BBF7D0;
+    border-left-color: #22c55e;
+    border-color: #86efac;
+  }
+  .jadwal-item-pilihan .jadwal-matkul {
+    color: #14532d;
+  }
+  .jadwal-item-pilihan .jadwal-dosen {
+    color: #15803d;
+  }
+
+  .jadwal-item-praktikum {
+    background: #FED7AA;
+    border-left-color: #f97316;
+    border-color: #fdba74;
+  }
+  .jadwal-item-praktikum .jadwal-matkul {
+    color: #7c2d12;
+  }
+  .jadwal-item-praktikum .jadwal-dosen {
+    color: #c2410c;
+  }
+
+  /* === Legend / Keterangan warna === */
+  .jadwal-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    padding: 10px 16px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    font-size: 13px;
+  }
+
+  .jadwal-legend-title {
+    font-weight: 700;
+    color: #333;
+    margin-right: 4px;
+  }
+
+  .jadwal-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .jadwal-legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,.12);
+    flex-shrink: 0;
+  }
+
+  .legend-wajib {
+    background: #BFDBFE;
+  }
+  .legend-pilihan {
+    background: #BBF7D0;
+  }
+  .legend-praktikum {
+    background: #FED7AA;
   }
 
   .jadwal-matkul {
@@ -87,9 +175,8 @@
   .weekend-empty {
     height: 108px;
     min-height: 108px;
-    background: #fde8e8 !important;
-    color: #c82333;
-    font-weight: 700;
+    background: #fafafa !important; /* neutral background */
+    color: inherit; /* default text color */
     text-align: center !important;
     vertical-align: middle !important;
     padding: 0 !important;
@@ -183,7 +270,7 @@
       <div class="col-sm-3">
         <ol class="breadcrumb float-sm-right">
           <li class="breadcrumb-item">
-            <a href="/home/dashboard"><i class="fas fa-igloo mr-2"></i>Home</a>
+            <a href="{{ session('user_login') ? '/home/dashboard' : '/' }}"><i class="fas fa-igloo mr-2"></i>Home</a>
           </li>
           <li class="breadcrumb-item active">Hasil Jadwal</li>
         </ol>
@@ -195,11 +282,12 @@
 <section class="content">
   <div class="container-fluid">
 
-    @if($user_login->role_id == 1)
+    @if($user_login && $user_login->role_id == 1)
       <a href="/generatejadwal" class="btn btn-outline-greenTheme mb-2">
         <i class="fas fa-recycle mr-1"></i>Generate Kembali Jadwal
       </a>
     @endif
+
 
     <div class="row">
       <div class="col-md-12">
@@ -268,9 +356,25 @@
 
         <div class="card semester-card jadwal-section" data-tahun="{{ $tahun }}">
           <div class="card-header bg-greenTheme">
-            <h3 class="card-title">
+            <h3 class="card-title text-white text-bold">
               Tabel Jadwal Perkuliahan {{ $sms->nama_semester }} <b>{{ $tahun }}</b>
             </h3>
+          </div>
+
+          {{-- Keterangan Warna --}}
+          <div style="padding: 14px 16px 0;">
+            <div class="jadwal-legend">
+              <span class="jadwal-legend-title"><i class="fas fa-palette mr-1"></i> Keterangan:</span>
+              <span class="jadwal-legend-item">
+                <span class="jadwal-legend-color legend-wajib"></span> Matkul Wajib
+              </span>
+              <span class="jadwal-legend-item">
+                <span class="jadwal-legend-color legend-pilihan"></span> Matkul Pilihan
+              </span>
+              <span class="jadwal-legend-item">
+                <span class="jadwal-legend-color legend-praktikum"></span> Praktikum
+              </span>
+            </div>
           </div>
 
           <div class="card-body p-0">
@@ -322,21 +426,40 @@
                           @if($items->count() > 0)
                             <td class="jadwal-cell">
                               @foreach($items as $item)
-                                <div class="jadwal-item">
+                                @php
+                                  // Tentukan kelas warna berdasarkan jenis & tipe matkul
+                                  $jenisItem = strtolower($item->jenis_matkul ?? 'teori');
+                                  $tipeItem  = strtolower($item->tipe_matkul ?? 'wajib');
+
+                                  if ($jenisItem === 'praktikum') {
+                                      $warnaClass = 'jadwal-item-praktikum';
+                                  } elseif ($tipeItem === 'pilihan') {
+                                      $warnaClass = 'jadwal-item-pilihan';
+                                  } else {
+                                      $warnaClass = 'jadwal-item-wajib';
+                                  }
+                                @endphp
+                                <div class="jadwal-item {{ $warnaClass }}">
                                   <div class="jadwal-matkul">{{ $item->matkul }}</div>
-                                  <div class="jadwal-dosen">{{ $formatDosen($item) }}</div>
+                                  <div class="jadwal-dosen">
+                                    @php
+                                      $dosenCodes = array_map('trim', explode(',', $formatDosen($item)));
+                                    @endphp
+                                    @foreach($dosenCodes as $index => $code)
+                                      @if($index > 0), @endif
+                                      <span class="class-dosen-badge" data-kode="{{ $code }}">{{ $code }}</span>
+                                    @endforeach
+                                  </div>
                                   <div class="jadwal-meta">
                                     Kelas {{ $item->kelas }} | {{ $item->jumlah_sks }} SKS
                                   </div>
-                                  <div class="jadwal-meta">{{ $item->nama_ruang }}</div>
+                                  <div class="jadwal-meta">{{ \App\Models\Ruang::formatName($item->nama_ruang) }}</div>
                                 </div>
                               @endforeach
                             </td>
                           @else
                             @if($isWeekend)
-                              <td class="weekend-empty">
-                                <div class="weekend-label-wrap">Tidak Digunakan</div>
-                              </td>
+                                      <td class="weekend-empty"></td>
                             @else
                               <td class="empty-cell">-</td>
                             @endif

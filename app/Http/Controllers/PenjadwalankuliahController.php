@@ -16,20 +16,29 @@ class PenjadwalankuliahController extends Controller
     private $cacheMatkulByKode = [];
     private $cacheRuangByKode = [];
     private $cacheAllRuang = null;
-    private $cacheWaktuByKode = [];
     private $cacheHariByKode = [];
-    private $cacheJamByKode = [];
     private $cacheAllDosenKodes = [];
     private $cacheBlocking = null;
     private $cacheProdiByKode = [];
     private $cacheDosenListByIdKelas = [];
     private $cacheKodeHariAktif = null;
-    private $cacheWaktuJoinJam = null;
-    private $cacheWaktuValidBySksHari = [];
     private $cacheRuangAlternatif = [];
     private $cacheDosenByKode = [];
     private $cacheAllDosenObjects = null;
     private $cacheMatkulDosen = [];
+    // Legacy properties (kept for compatibility; waktu/jam tables removed)
+    private $cacheWaktuByKode = [];
+    private $cacheJamByKode = [];
+    private $cacheWaktuJoinJam = null;
+    private $cacheWaktuValidBySksHari = [];
+
+    // Dynamic scheduling settings
+    private $jamMulaiSetting = '07:00';
+    private $jamTerakhirSetting = '17:00';
+    private $durasiSksSetting = 50;
+    private $jedaSetting = 10;
+    private $istirahatMulaiSetting = '12:00';
+    private $istirahatSelesaiSetting = '13:00';
 
     private function preloadReferenceData()
     {
@@ -54,24 +63,15 @@ class PenjadwalankuliahController extends Controller
             $this->cacheRuangByKode[$r->kode_ruang] = $r;
         }
 
-        foreach (DB::table('waktu')->get() as $w) {
-            $this->cacheWaktuByKode[$w->kode_waktu] = $w;
-        }
 
-        $this->cacheWaktuJoinJam = DB::table('waktu')
-            ->join('jam', 'jam.kode_jam', '=', 'waktu.kode_jam')
-            ->select('waktu.kode_waktu', 'waktu.kode_hari', 'waktu.kode_jam', 'jam.jam')
-            ->orderBy('jam.jam')
-            ->orderBy('waktu.kode_waktu')
-            ->get();
+
+
 
         foreach (DB::table('hari')->get() as $h) {
             $this->cacheHariByKode[$h->kode_hari] = $h;
         }
 
-        foreach (DB::table('jam')->get() as $j) {
-            $this->cacheJamByKode[$j->kode_jam] = $j;
-        }
+
 
         $allDosen = DB::table('dosen')->orderBy('kode_dosen')->get();
         $this->cacheAllDosenObjects = $allDosen;
@@ -184,28 +184,45 @@ class PenjadwalankuliahController extends Controller
         $keyPengampu = $kelasMatkul->kode_matkul . '|' . ($kelasMatkul->tahun_ajaran ?? '');
         $dosenPengampu = $this->cacheMatkulDosen[$keyPengampu] ?? [];
 
-        if (count($dosenPengampu) >= 2) {
-            // Dosen pengampu sudah di-set manual, pilih 2 dosen secara acak.
-            $result = $this->pilihDuaDosenAcak($dosenPengampu, 2);
-            $this->cacheDosenListByIdKelas[$idKelas] = $result;
-            return $result;
-        }
+        if (count($dosenPengampu) >= 1) {
+            // Ambil semua kelas untuk matkul ini pada tahun ajaran dan semester yang sama, urutkan berdasarkan nama_kelas
+            $allClassesForMatkul = DB::table('kelas_matkul')
+                ->where('kode_matkul', $kelasMatkul->kode_matkul)
+                ->where('tahun_ajaran', $kelasMatkul->tahun_ajaran)
+                ->where('kode_semester', $kelasMatkul->kode_semester)
+                ->orderBy('nama_kelas')
+                ->get();
 
-        if (count($dosenPengampu) == 1) {
-            // Satu dosen pengampu tetap, cari satu lagi dari prodi
-            $kodeProdi = $kelasMatkul->kode_prodi ?? ($matkul->kode_prodi ?? null);
-            $candidate = $this->getDosenCandidateByKodeProdi($kodeProdi);
-            $candidate = array_values(array_diff($candidate, $dosenPengampu));
-            if (count($candidate) > 0) {
-                $tambahanDosen = $this->pilihDuaDosenAcak($candidate, 1);
-                $result = array_merge($dosenPengampu, $tambahanDosen);
-            } else {
-                $global = $this->getDosenCandidateGlobal();
-                $global = array_values(array_diff($global, $dosenPengampu));
-                $tambahanDosen = $this->pilihDuaDosenAcak($global, 1);
-                $result = count($tambahanDosen) > 0 ? array_merge($dosenPengampu, $tambahanDosen) : $dosenPengampu;
+            $totalClasses = $allClassesForMatkul->count();
+            $currentClassIndex = 0;
+            foreach ($allClassesForMatkul as $index => $c) {
+                if ($c->id_kelas == $kelasMatkul->id_kelas) {
+                    $currentClassIndex = $index;
+                    break;
+                }
             }
-            $result = $this->pilihDuaDosenAcak($result, 2);
+
+            $dosenCount = count($dosenPengampu);
+
+            // Jika jumlah dosen pengampu > 2 dan cukup untuk dibagikan ke kelas-kelas (dosenCount >= totalClasses),
+            // maka distribusikan secara merata.
+            if ($dosenCount > 2 && $dosenCount >= $totalClasses && $totalClasses > 1) {
+                $base = (int) floor($dosenCount / $totalClasses);
+                $remainder = $dosenCount % $totalClasses;
+
+                $offset = 0;
+                for ($i = 0; $i < $currentClassIndex; $i++) {
+                    $offset += $base + ($i < $remainder ? 1 : 0);
+                }
+                $limit = $base + ($currentClassIndex < $remainder ? 1 : 0);
+
+                $result = array_slice($dosenPengampu, $offset, $limit);
+            } else {
+                // Sebaliknya (dosenCount <= 2 atau jumlah dosen lebih sedikit dari jumlah kelas),
+                // berikan semua dosen pengampu untuk semua kelas.
+                $result = array_values(array_unique(array_filter($dosenPengampu)));
+            }
+
             $this->cacheDosenListByIdKelas[$idKelas] = $result;
             return $result;
         }
@@ -224,7 +241,6 @@ class PenjadwalankuliahController extends Controller
         }
 
         // Tidak ada dosen pengampu manual: pilih 2 dosen secara acak dari kandidat.
-        // Versi sebelumnya memakai seed deterministik per kelas, sehingga hasil generate cenderung sama.
         $result = $this->pilihDuaDosenAcak($candidate, 2);
 
         $this->cacheDosenListByIdKelas[$idKelas] = $result;
@@ -374,7 +390,7 @@ class PenjadwalankuliahController extends Controller
 
     private function hitungJamSelesai($jamMulai, $jumlahSks)
     {
-        $menitDalamSks = ((int) $jumlahSks) * 45;
+        $menitDalamSks = ((int) $jumlahSks) * 50;
         $totalMenit = $this->jamToMinutes($jamMulai) + $menitDalamSks;
 
         return $this->minutesToJam($totalMenit);
@@ -382,9 +398,7 @@ class PenjadwalankuliahController extends Controller
 
     private function isJamSelesaiValid($jamMulai, $jumlahSks)
     {
-        $jamSelesai = $this->hitungJamSelesai($jamMulai, $jumlahSks);
-
-        return $this->jamToMinutes($jamSelesai) <= $this->jamToMinutes($this->getBatasJamSelesaiKuliah());
+        return $this->jamToMinutes($jamMulai) <= $this->jamToMinutes($this->jamTerakhirSetting);
     }
 
     private function getJumlahSksByKelasMatkul($kelasMatkul)
@@ -449,41 +463,25 @@ class PenjadwalankuliahController extends Controller
 
     private function getKodeWaktuValidBySks($jumlahSks)
     {
+        // waktu/jam tables removed: return valid kode_hari (1-5 for teori, 6-7 for praktikum)
         $cacheKey = 'sks_' . $jumlahSks;
         if (isset($this->cacheWaktuValidBySksHari[$cacheKey])) {
             return $this->cacheWaktuValidBySksHari[$cacheKey];
         }
-
-        $waktuList = $this->cacheLoaded && $this->cacheWaktuJoinJam
-            ? $this->cacheWaktuJoinJam
-            : DB::table('waktu')
-                ->join('jam', 'jam.kode_jam', '=', 'waktu.kode_jam')
-                ->select('waktu.kode_waktu', 'jam.jam')
-                ->orderBy('waktu.kode_waktu')
-                ->get();
-
-        $kodeWaktuValid = [];
-
-        foreach ($waktuList as $waktu) {
-            if ($this->isJamSelesaiValid($waktu->jam, $jumlahSks)) {
-                $kodeWaktuValid[] = $waktu->kode_waktu;
-            }
-        }
-
-        $result = array_values(array_unique($kodeWaktuValid));
+        $kodeHariAktif = $this->getKodeHariAktifKuliah();
+        $result = count($kodeHariAktif) > 0 ? $kodeHariAktif : [1, 2, 3, 4, 5];
         $this->cacheWaktuValidBySksHari[$cacheKey] = $result;
         return $result;
     }
 
     private function randomKodeWaktuValidBySks($jumlahSks)
     {
-        $kodeWaktuValid = $this->getKodeWaktuValidBySks($jumlahSks);
-
-        if (count($kodeWaktuValid) == 0) {
+        // waktu/jam tables removed: just pick a random valid kode_hari
+        $kodeHariAktif = $this->getKodeHariAktifKuliah();
+        if (count($kodeHariAktif) == 0) {
             return null;
         }
-
-        return $kodeWaktuValid[mt_rand(0, count($kodeWaktuValid) - 1)];
+        return $kodeHariAktif[mt_rand(0, count($kodeHariAktif) - 1)];
     }
 
     private function getKodeHariAktifKuliah()
@@ -526,38 +524,21 @@ class PenjadwalankuliahController extends Controller
 
     private function getKodeWaktuValidBySksAndHari($jumlahSks, $kodeHari = null)
     {
+        // waktu/jam tables removed. Returns list of kode_hari values.
         $cacheKey = $jumlahSks . '_' . ($kodeHari ?? 'all');
         if (isset($this->cacheWaktuValidBySksHari[$cacheKey])) {
             return $this->cacheWaktuValidBySksHari[$cacheKey];
         }
 
-        if ($this->cacheLoaded && $this->cacheWaktuJoinJam) {
-            $waktuList = $kodeHari !== null
-                ? $this->cacheWaktuJoinJam->where('kode_hari', $kodeHari)->values()
-                : $this->cacheWaktuJoinJam;
+        if ($kodeHari !== null) {
+            $result = [$kodeHari];
         } else {
-            $query = DB::table('waktu')
-                ->join('jam', 'jam.kode_jam', '=', 'waktu.kode_jam')
-                ->select('waktu.kode_waktu', 'jam.jam')
-                ->orderBy('jam.jam')
-                ->orderBy('waktu.kode_waktu');
-
-            if ($kodeHari !== null) {
-                $query->where('waktu.kode_hari', $kodeHari);
-            }
-
-            $waktuList = $query->get();
-        }
-
-        $kodeWaktuValid = [];
-
-        foreach ($waktuList as $waktu) {
-            if ($this->isJamSelesaiValid($waktu->jam, $jumlahSks)) {
-                $kodeWaktuValid[] = $waktu->kode_waktu;
+            $result = $this->getKodeHariAktifKuliah();
+            if (count($result) == 0) {
+                $result = [1, 2, 3, 4, 5];
             }
         }
 
-        $result = array_values(array_unique($kodeWaktuValid));
         $this->cacheWaktuValidBySksHari[$cacheKey] = $result;
         return $result;
     }
@@ -567,9 +548,26 @@ class PenjadwalankuliahController extends Controller
         $kodeWaktuValid = $this->getKodeWaktuValidBySksAndHari($jumlahSks, $kodeHari);
 
         if (count($kodeWaktuValid) == 0) {
-            return $this->randomKodeWaktuValidBySks($jumlahSks);
+            if ($kodeHari !== null) {
+                if ($kodeHari == 6 || $kodeHari == 7) {
+                    $otherDay = ($kodeHari == 6) ? 7 : 6;
+                    $kodeWaktuValid = $this->getKodeWaktuValidBySksAndHari($jumlahSks, $otherDay);
+                } else {
+                    foreach ([1, 2, 3, 4, 5] as $day) {
+                        $wValid = $this->getKodeWaktuValidBySksAndHari($jumlahSks, $day);
+                        if (count($wValid) > 0) {
+                            $kodeWaktuValid = array_merge($kodeWaktuValid, $wValid);
+                        }
+                    }
+                }
+            }
+
+            if (count($kodeWaktuValid) == 0) {
+                return $this->randomKodeWaktuValidBySks($jumlahSks);
+            }
         }
 
+        // waktu/jam tables removed: kodeWaktuValid contains kode_hari values
         return $kodeWaktuValid[mt_rand(0, count($kodeWaktuValid) - 1)];
     }
 
@@ -619,30 +617,64 @@ class PenjadwalankuliahController extends Controller
 
     private function isKodeWaktuValidBySks($kodeWaktu, $jumlahSks)
     {
-        if ($this->cacheLoaded) {
-            $waktu = $this->getCachedWaktu($kodeWaktu);
-            if (!$waktu) return false;
-            $jam = $this->getCachedJam($waktu->kode_jam);
-            if (!$jam) return false;
-            return $this->isJamSelesaiValid($jam->jam, $jumlahSks);
-        }
-
-        $jamMulai = DB::table('waktu')
-            ->join('jam', 'jam.kode_jam', '=', 'waktu.kode_jam')
-            ->where('waktu.kode_waktu', $kodeWaktu)
-            ->value('jam.jam');
-
-        if (!$jamMulai) {
-            return false;
-        }
-
-        return $this->isJamSelesaiValid($jamMulai, $jumlahSks);
+        // waktu/jam tables removed. kodeWaktu is now treated as kode_hari.
+        // Any valid kode_hari is considered a valid "time slot".
+        return is_numeric($kodeWaktu) && $kodeWaktu > 0;
     }
 
 
-    private function getRuangAlternatifValid($kodeProdi = null, $jumlahMahasiswa = 0, $jenisMatkul = null)
+    private function isMatkulFisikaDasar($namaMatkul)
     {
-        $cacheKey = ($kodeProdi ?? 'null') . '_' . $jumlahMahasiswa . '_' . ($jenisMatkul ?? 'all');
+        if (!$namaMatkul) {
+            return false;
+        }
+        $lower = strtolower($namaMatkul);
+        $hasFisikaDasar = strpos($lower, 'fisika') !== false && strpos($lower, 'dasar') !== false;
+        $isPrak = strpos($lower, 'prak') !== false || strpos($lower, 'praktikum') !== false;
+        return $hasFisikaDasar && $isPrak;
+    }
+
+    private function isRuangFisika($namaRuang)
+    {
+        if (!$namaRuang) {
+            return false;
+        }
+        $lower = strtolower($namaRuang);
+        return (strpos($lower, 'laboratorium fisika') !== false || strpos($lower, 'lab fisika') !== false || strpos($lower, 'lab. fisika') !== false);
+    }
+
+    private function getNamaMatkulByKelasMatkul($kelasMatkul)
+    {
+        if (!$kelasMatkul) {
+            return '';
+        }
+
+        if ($this->cacheLoaded) {
+            $matkul = $this->getCachedMatkul($kelasMatkul->kode_matkul, $kelasMatkul->tahun_ajaran);
+            if (!$matkul) {
+                $matkul = $this->getCachedMatkul($kelasMatkul->kode_matkul);
+            }
+            return $matkul && isset($matkul->nama_matkul) ? $matkul->nama_matkul : '';
+        }
+
+        $nama = DB::table('matkul')
+            ->where('kode_matkul', $kelasMatkul->kode_matkul)
+            ->where('tahun_ajaran', $kelasMatkul->tahun_ajaran)
+            ->value('nama_matkul');
+
+        if (!$nama) {
+            $nama = DB::table('matkul')
+                ->where('kode_matkul', $kelasMatkul->kode_matkul)
+                ->value('nama_matkul');
+        }
+
+        return $nama ?: '';
+    }
+
+
+    private function getRuangAlternatifValid($kodeProdi = null, $jumlahMahasiswa = 0, $jenisMatkul = null, $namaMatkul = null)
+    {
+        $cacheKey = ($kodeProdi ?? 'null') . '_' . $jumlahMahasiswa . '_' . ($jenisMatkul ?? 'all') . '_' . ($namaMatkul ?? 'all');
         if (isset($this->cacheRuangAlternatif[$cacheKey])) {
             return $this->cacheRuangAlternatif[$cacheKey];
         }
@@ -696,60 +728,72 @@ class PenjadwalankuliahController extends Controller
             if ($ruangList->isEmpty()) {
                 $ruangList = $this->cacheAllRuang;
             }
+        } else {
+            $ruangQuery = DB::table('ruang');
 
-            $this->cacheRuangAlternatif[$cacheKey] = $ruangList;
-            return $ruangList;
-        }
+            if ($kodeProdi) {
+                $namaProdi = DB::table('prodi')
+                    ->where('kode_prodi', $kodeProdi)
+                    ->value('nama_prodi');
 
-        $ruangQuery = DB::table('ruang');
+                if ($namaProdi) {
+                    $ruangQuery->where('nama_prodi', $namaProdi);
+                }
+            }
 
-        if ($kodeProdi) {
-            $namaProdi = DB::table('prodi')
-                ->where('kode_prodi', $kodeProdi)
-                ->value('nama_prodi');
+            if ($tipeRuangTarget) {
+                $ruangQuery->where('tipe_ruang', $tipeRuangTarget);
+            }
 
-            if ($namaProdi) {
-                $ruangQuery->where('nama_prodi', $namaProdi);
+            $ruangList = $ruangQuery
+                ->where('kapasitas', '>=', $jumlahMahasiswa ?: 0)
+                ->orderBy('kode_ruang')
+                ->get();
+
+            // Fallback: hanya tipe ruang (tanpa prodi/kapasitas)
+            if (count($ruangList) == 0 && $tipeRuangTarget) {
+                $ruangList = DB::table('ruang')
+                    ->where('tipe_ruang', $tipeRuangTarget)
+                    ->where('kapasitas', '>=', $jumlahMahasiswa ?: 0)
+                    ->orderBy('kode_ruang')
+                    ->get();
+            }
+
+            if (count($ruangList) == 0 && $tipeRuangTarget) {
+                $ruangList = DB::table('ruang')
+                    ->where('tipe_ruang', $tipeRuangTarget)
+                    ->orderBy('kode_ruang')
+                    ->get();
+            }
+
+            if (count($ruangList) == 0) {
+                $ruangList = DB::table('ruang')
+                    ->where('kapasitas', '>=', $jumlahMahasiswa ?: 0)
+                    ->orderBy('kode_ruang')
+                    ->get();
+            }
+
+            if (count($ruangList) == 0) {
+                $ruangList = DB::table('ruang')
+                    ->orderBy('kode_ruang')
+                    ->get();
             }
         }
 
-        if ($tipeRuangTarget) {
-            $ruangQuery->where('tipe_ruang', $tipeRuangTarget);
+        $isFisikaDasar = $this->isMatkulFisikaDasar($namaMatkul);
+
+        if (!($ruangList instanceof \Illuminate\Support\Collection)) {
+            $ruangList = collect($ruangList);
         }
 
-        $ruangList = $ruangQuery
-            ->where('kapasitas', '>=', $jumlahMahasiswa ?: 0)
-            ->orderBy('kode_ruang')
-            ->get();
-
-        // Fallback: hanya tipe ruang (tanpa prodi/kapasitas)
-        if (count($ruangList) == 0 && $tipeRuangTarget) {
-            $ruangList = DB::table('ruang')
-                ->where('tipe_ruang', $tipeRuangTarget)
-                ->where('kapasitas', '>=', $jumlahMahasiswa ?: 0)
-                ->orderBy('kode_ruang')
-                ->get();
-        }
-
-        if (count($ruangList) == 0 && $tipeRuangTarget) {
-            $ruangList = DB::table('ruang')
-                ->where('tipe_ruang', $tipeRuangTarget)
-                ->orderBy('kode_ruang')
-                ->get();
-        }
-
-        if (count($ruangList) == 0) {
-            $ruangList = DB::table('ruang')
-                ->where('kapasitas', '>=', $jumlahMahasiswa ?: 0)
-                ->orderBy('kode_ruang')
-                ->get();
-        }
-
-        if (count($ruangList) == 0) {
-            $ruangList = DB::table('ruang')
-                ->orderBy('kode_ruang')
-                ->get();
-        }
+        $ruangList = $ruangList->filter(function ($r) use ($isFisikaDasar) {
+            $isFisikaRuang = $this->isRuangFisika($r->nama_ruang);
+            if ($isFisikaDasar) {
+                return $isFisikaRuang;
+            } else {
+                return !$isFisikaRuang;
+            }
+        })->values();
 
         $this->cacheRuangAlternatif[$cacheKey] = $ruangList;
         return $ruangList;
@@ -762,24 +806,41 @@ class PenjadwalankuliahController extends Controller
             return $this->cacheWaktuValidBySksHari['wc_' . $cacheKey];
         }
 
-        if ($this->cacheLoaded && $this->cacheWaktuJoinJam) {
-            $waktuList = $this->cacheWaktuJoinJam->where('kode_hari', $kodeHari)->values();
-        } else {
-            $waktuList = DB::table('waktu')
-                ->join('jam', 'jam.kode_jam', '=', 'waktu.kode_jam')
-                ->where('waktu.kode_hari', $kodeHari)
-                ->select('waktu.kode_waktu', 'waktu.kode_hari', 'waktu.kode_jam', 'jam.jam')
-                ->orderBy('jam.jam')
-                ->orderBy('waktu.kode_waktu')
-                ->get();
-        }
+        $batasMulaiMenit = $this->jamToMinutes($this->jamTerakhirSetting);
+        $durasiMenit = $jumlahSks * $this->durasiSksSetting;
+        $jedaMenit = $this->jedaSetting;
 
         $hasil = [];
+        $slotMulai = $this->jamToMinutes($this->jamMulaiSetting);
+        $slotIdx = 1;
 
-        foreach ($waktuList as $waktu) {
-            if ($this->isJamSelesaiValid($waktu->jam, $jumlahSks)) {
-                $hasil[] = $waktu;
+        while ($slotMulai <= $batasMulaiMenit) {
+            $jamStr = $this->minutesToJam($slotMulai);
+            $selesaiMenit = $slotMulai + $durasiMenit;
+
+            // Skip lunch break
+            $istirahatMulaiMinutes = $this->jamToMinutes($this->istirahatMulaiSetting);
+            $istirahatSelesaiMinutes = $this->jamToMinutes($this->istirahatSelesaiSetting);
+
+            if ($slotMulai < $istirahatMulaiMinutes && $selesaiMenit > $istirahatMulaiMinutes) {
+                $slotMulai = $istirahatSelesaiMinutes;
+                continue;
             }
+            if ($slotMulai >= $istirahatMulaiMinutes && $slotMulai < $istirahatSelesaiMinutes) {
+                $slotMulai = $istirahatSelesaiMinutes;
+                continue;
+            }
+
+            $slot = (object)[
+                'kode_waktu' => $kodeHari * 100 + $slotIdx,
+                'kode_hari'  => $kodeHari,
+                'kode_jam'   => $slotIdx,
+                'jam'        => $jamStr,
+            ];
+            $hasil[] = $slot;
+
+            $slotMulai += $jedaMenit;
+            $slotIdx++;
         }
 
         $this->cacheWaktuValidBySksHari['wc_' . $cacheKey] = $hasil;
@@ -906,15 +967,15 @@ class PenjadwalankuliahController extends Controller
             $dosenB = $candidate['kode_dosen_list'] ?? [];
 
             if ($this->isDosenBentrok($dosenA, $dosenB)) {
-                $score += 65000;
+                $score += 95000;
             }
 
             if (($existing['kode_ruang'] ?? null) && ($existing['kode_ruang'] ?? null) == ($candidate['kode_ruang'] ?? null)) {
-                $score += 55000;
+                $score += 90000;
             }
 
             if (($existing['kode_rombel'] ?? '-') != '-' && ($existing['kode_rombel'] ?? '-') == ($candidate['kode_rombel'] ?? '-')) {
-                $score += 55000;
+                $score += 90000;
             }
         }
 
@@ -997,15 +1058,15 @@ class PenjadwalankuliahController extends Controller
         }
 
         if ($jumlahBentrokDosen > 0) {
-            $score += 65000 + min($jumlahBentrokDosen, 10) * 2500;
+            $score += 95000 + min($jumlahBentrokDosen, 10) * 2500;
         }
 
         if ($jumlahBentrokRuang > 0) {
-            $score += 55000 + min($jumlahBentrokRuang, 10) * 2000;
+            $score += 90000 + min($jumlahBentrokRuang, 10) * 2000;
         }
 
         if ($jumlahBentrokRombel > 0) {
-            $score += 55000 + min($jumlahBentrokRombel, 10) * 2000;
+            $score += 90000 + min($jumlahBentrokRombel, 10) * 2000;
         }
 
         return $score;
@@ -1060,8 +1121,9 @@ class PenjadwalankuliahController extends Controller
 
         $prioritasMap = [];
         foreach ($prioritasKelas as $prioritas) {
-            if (isset($prioritas['id_kelas'], $prioritas['kode_waktu'])) {
-                $prioritasMap[$prioritas['id_kelas']] = $prioritas['kode_waktu'];
+            if (isset($prioritas['id_kelas'])) {
+                // Support both old kode_waktu-based and new kode_hari-based prioritas
+                $prioritasMap[$prioritas['id_kelas']] = $prioritas['kode_hari'] ?? ($prioritas['kode_waktu'] ?? null);
             }
         }
 
@@ -1069,6 +1131,8 @@ class PenjadwalankuliahController extends Controller
         foreach ($kodeHariAktif as $kodeHari) {
             $hariLoad[$kodeHari] = 0;
         }
+        $hariLoad[6] = 0;
+        $hariLoad[7] = 0;
 
         $order = array_keys($chromosomes);
         usort($order, function ($a, $b) use ($chromosomes) {
@@ -1113,15 +1177,16 @@ class PenjadwalankuliahController extends Controller
             $kodeDosenList = $this->getKodeDosenListByIdKelas($idKelas);
             $kodeDosenList = array_values(array_unique(array_filter($kodeDosenList)));
 
-            if (count($kodeDosenList) < 2) {
+            if (count($kodeDosenList) < 1) {
                 $hasil[$idx] = $old;
                 continue;
             }
 
             $jenisMatkul = $this->getJenisMatkulByKelasMatkul($kelasMatkul);
+            $namaMatkul = $this->getNamaMatkulByKelasMatkul($kelasMatkul);
 
             $ruangList = [];
-            foreach ($this->getRuangAlternatifValid($kodeProdi, $jumlahMahasiswa, $jenisMatkul) as $ruang) {
+            foreach ($this->getRuangAlternatifValid($kodeProdi, $jumlahMahasiswa, $jenisMatkul, $namaMatkul) as $ruang) {
                 $ruangList[] = $ruang;
             }
 
@@ -1142,12 +1207,16 @@ class PenjadwalankuliahController extends Controller
             });
 
             if ($aggressive) {
-                $ruangList = array_slice($ruangList, 0, 12);
+                $ruangList = array_slice($ruangList, 0, 24);
             } else {
-                $ruangList = array_slice($ruangList, 0, 6);
+                $ruangList = array_slice($ruangList, 0, 15);
             }
 
-            $urutanHari = $kodeHariAktif;
+            if ($jenisMatkul === 'praktikum') {
+                $urutanHari = [6, 7];
+            } else {
+                $urutanHari = $kodeHariAktif;
+            }
             shuffle($urutanHari);
             usort($urutanHari, function ($a, $b) use ($hariLoad) {
                 if (($hariLoad[$a] ?? 0) == ($hariLoad[$b] ?? 0)) {
@@ -1160,44 +1229,23 @@ class PenjadwalankuliahController extends Controller
             $waktuCandidates = [];
             $seenWaktu = [];
 
-            $kodeWaktuPrioritas = $prioritasMap[$idKelas] ?? null;
-            if ($kodeWaktuPrioritas && $this->isKodeWaktuValidBySks($kodeWaktuPrioritas, $jumlahSks)) {
-                $waktuPrioritas = $this->getCachedWaktu($kodeWaktuPrioritas);
-                if ($waktuPrioritas) {
-                    $jamPrioritas = $this->getCachedJam($waktuPrioritas->kode_jam);
-                    if ($jamPrioritas) {
-                        $waktuPrioritas->jam = $jamPrioritas->jam;
-                        $waktuCandidates[] = $waktuPrioritas;
-                        $seenWaktu[$waktuPrioritas->kode_waktu] = true;
-                    }
-                }
-            }
-
-            $kodeWaktuLama = $old[2] ?? null;
-            if ($kodeWaktuLama && $this->isKodeWaktuValidBySks($kodeWaktuLama, $jumlahSks) && !isset($seenWaktu[$kodeWaktuLama])) {
-                $waktuLama = $this->getCachedWaktu($kodeWaktuLama);
-                if ($waktuLama) {
-                    $jamLama = $this->getCachedJam($waktuLama->kode_jam);
-                    if ($jamLama) {
-                        $waktuLama->jam = $jamLama->jam;
-                        $waktuCandidates[] = $waktuLama;
-                        $seenWaktu[$waktuLama->kode_waktu] = true;
-                    }
-                }
-            }
+            // kode_hari stored at index [2] - prioritas is now hari-based
+            $kodeHariPrioritas = $prioritasMap[$idKelas] ?? null;
+            // (waktu table removed - priority injected via urutanHari ordering below)
 
             foreach ($urutanHari as $kodeHari) {
                 $listWaktuHari = $this->getWaktuCandidatesByHariAndSks($kodeHari, $jumlahSks);
-                if ($aggressive && count($listWaktuHari) > 16) {
+                if ($aggressive && count($listWaktuHari) > 32) {
+                    $listWaktuHari = array_slice($listWaktuHari, 0, 32);
+                } elseif (!$aggressive && count($listWaktuHari) > 16) {
                     $listWaktuHari = array_slice($listWaktuHari, 0, 16);
-                } elseif (!$aggressive && count($listWaktuHari) > 8) {
-                    $listWaktuHari = array_slice($listWaktuHari, 0, 8);
                 }
 
                 foreach ($listWaktuHari as $waktu) {
-                    if (!isset($seenWaktu[$waktu->kode_waktu])) {
+                    $wKey = $waktu->kode_hari . '_' . $waktu->kode_jam;
+                    if (!isset($seenWaktu[$wKey])) {
                         $waktuCandidates[] = $waktu;
-                        $seenWaktu[$waktu->kode_waktu] = true;
+                        $seenWaktu[$wKey] = true;
                     }
                 }
             }
@@ -1231,6 +1279,15 @@ class PenjadwalankuliahController extends Controller
                         $roomMismatch = 1;
                     }
 
+                    $isFisikaDasar = $this->isMatkulFisikaDasar($namaMatkul);
+                    $isFisikaRuang = $this->isRuangFisika($ruang->nama_ruang);
+
+                    if ($isFisikaDasar && !$isFisikaRuang) {
+                        $roomMismatch = 1;
+                    } elseif (!$isFisikaDasar && $isFisikaRuang) {
+                        $roomMismatch = 1;
+                    }
+
                     $candidate = [
                         'kode_hari' => $waktu->kode_hari,
                         'kode_jam' => $waktu->kode_jam,
@@ -1249,7 +1306,12 @@ class PenjadwalankuliahController extends Controller
                     $score = $baseScore;
                     $score += ($hariLoad[$waktu->kode_hari] ?? 0) * 20;
 
-                    if ($kodeWaktuPrioritas && $waktu->kode_waktu != $kodeWaktuPrioritas) {
+                    // Penalty jika 3 SKS tidak di pagi hari
+                    if ($jumlahSks == 3 && !$this->isSlotPagi($jamMulai)) {
+                        $score += 150;
+                    }
+
+                    if ($kodeHariPrioritas && $waktu->kode_hari != $kodeHariPrioritas) {
                         $score += 5;
                     }
 
@@ -1260,7 +1322,7 @@ class PenjadwalankuliahController extends Controller
                     if ($score < $bestScore) {
                         $bestScore = $score;
                         $bestCandidate = $candidate;
-                        $bestChromosome = [$idKelas, $ruang->kode_ruang, $waktu->kode_waktu];
+                        $bestChromosome = [$idKelas, $ruang->kode_ruang, $waktu->kode_hari];
 
                         // Jangan langsung berhenti di kandidat nol pertama. Biarkan kandidat lain ikut bersaing
                         // supaya hasil akhir tidak selalu identik pada setiap klik generate.
@@ -1335,7 +1397,9 @@ class PenjadwalankuliahController extends Controller
                 return $jumlahPerHari[$a] <=> $jumlahPerHari[$b];
             });
 
-            $ruangList = $this->getRuangAlternatifValid($kodeProdi, $jumlahMahasiswa);
+            $jenisMatkul = $this->getJenisMatkulByKelasMatkul($kelasMatkul);
+            $namaMatkul = $this->getNamaMatkulByKelasMatkul($kelasMatkul);
+            $ruangList = $this->getRuangAlternatifValid($kodeProdi, $jumlahMahasiswa, $jenisMatkul, $namaMatkul);
             $terpasang = false;
 
             foreach ($urutanHari as $kodeHari) {
@@ -1454,7 +1518,7 @@ class PenjadwalankuliahController extends Controller
             $kodeDosenList = $this->getKodeDosenListByIdKelas($kelasMatkul->id_kelas);
             $kodeDosenList = array_values(array_unique(array_filter($kodeDosenList)));
 
-            if (count($kodeDosenList) < 2) {
+            if (count($kodeDosenList) < 1) {
                 continue;
             }
 
@@ -1462,7 +1526,9 @@ class PenjadwalankuliahController extends Controller
             $jumlahSks = (int) ($matkul->sks ?: 1);
             $jumlahMahasiswa = (int) ($kelasMatkul->jumlah_mahasiswa ?: 0);
             $kodeRombel = $kelasMatkul->kode_rombel ?: ($kelasMatkul->kode_matkul . $kelasMatkul->nama_kelas);
-            $ruangList = $this->getRuangAlternatifValid($kelasMatkul->kode_prodi ?? ($matkul->kode_prodi ?? null), $jumlahMahasiswa);
+            $jenisMatkul = $matkul ? $matkul->jenis_matkul : 'teori';
+            $namaMatkul = $matkul ? $matkul->nama_matkul : '';
+            $ruangList = $this->getRuangAlternatifValid($kelasMatkul->kode_prodi ?? ($matkul->kode_prodi ?? null), $jumlahMahasiswa, $jenisMatkul, $namaMatkul);
 
             $urutanHari = $kodeHariAktif;
             usort($urutanHari, function ($a, $b) use ($hariLoad) {
@@ -1653,34 +1719,93 @@ class PenjadwalankuliahController extends Controller
             ];
         }
 
-        // Generate tetap membutuhkan daftar kelas dari kelas_matkul.
-        // Jika sebuah mata kuliah belum punya kelas sama sekali, sistem membuat kelas default A.
-        // Tetapi dosen tidak disimpan ke kelas_matkul_dosen/kuliah/kelas. Dosen dipilih saat generate final.
+        // Sinkronisasi data kelas dari tabel `kelas` (sumber data Kelola Kelas) ke tabel `kelas_matkul`
         foreach ($matkulList as $matkul) {
-            $jumlahKelasMatkul = DB::table('kelas_matkul')
-                ->where('kode_matkul', $matkul->kode_matkul)
+            // Ambil semua kelas yang didaftarkan user di Kelola Kelas (tabel kelas) untuk matkul ini
+            $kelasDbList = DB::table('kelas')
                 ->where('tahun_ajaran', $tahunAjaran)
-                ->count();
+                ->where('nama_matkul', strtolower($matkul->nama_matkul))
+                ->get();
 
-            if ($jumlahKelasMatkul > 0) {
-                continue;
+            if ($kelasDbList->count() > 0) {
+                $validNamaKelas = [];
+                foreach ($kelasDbList as $kelasDb) {
+                    $namaKelasUpper = strtoupper(trim($kelasDb->kelas));
+                    $validNamaKelas[] = $namaKelasUpper;
+
+                    $existing = DB::table('kelas_matkul')
+                        ->where('kode_matkul', $matkul->kode_matkul)
+                        ->where('nama_kelas', $namaKelasUpper)
+                        ->where('tahun_ajaran', $tahunAjaran)
+                        ->first();
+
+                    if ($existing) {
+                        DB::table('kelas_matkul')
+                            ->where('id_kelas', $existing->id_kelas)
+                            ->update([
+                                'kode_rombel'      => $kelasDb->kode_kelas,
+                                'jumlah_mahasiswa' => $kelasDb->kapasitas_kelas,
+                                'kode_semester'    => $matkul->kode_semester,
+                                'kode_prodi'       => $matkul->kode_prodi,
+                                'updated_at'       => now(),
+                            ]);
+                    } else {
+                        DB::table('kelas_matkul')->insert([
+                            'kode_matkul'      => $matkul->kode_matkul,
+                            'nama_kelas'       => $namaKelasUpper,
+                            'kode_rombel'      => $kelasDb->kode_kelas,
+                            'jumlah_mahasiswa' => $kelasDb->kapasitas_kelas,
+                            'kode_semester'    => $matkul->kode_semester,
+                            'tahun_ajaran'     => $tahunAjaran,
+                            'kode_prodi'       => $matkul->kode_prodi,
+                            'created_at'       => now(),
+                            'updated_at'       => now(),
+                        ]);
+                    }
+                }
+
+                // Hapus data kelas_matkul yang sudah tidak ada di Kelola Kelas
+                DB::table('kelas_matkul')
+                    ->where('kode_matkul', $matkul->kode_matkul)
+                    ->where('tahun_ajaran', $tahunAjaran)
+                    ->whereNotIn('nama_kelas', $validNamaKelas)
+                    ->delete();
+            } else {
+                // Hapus data kelas_matkul yang sudah tidak valid
+                DB::table('kelas_matkul')
+                    ->where('kode_matkul', $matkul->kode_matkul)
+                    ->where('tahun_ajaran', $tahunAjaran)
+                    ->delete();
+
+                // Jika user sama sekali tidak mendaftarkan kelas untuk matkul ini, buatkan kelas default A
+                // di tabel `kelas` dan `kelas_matkul` agar tetap sinkron.
+                $kelasDefault = 'A';
+                $kodeKelas = $matkul->kode_matkul . $kelasDefault;
+                $jumlahMahasiswaDefault = 40;
+
+                DB::table('kelas')->insert([
+                    'kode_kelas'      => $kodeKelas,
+                    'nama_matkul'     => strtolower($matkul->nama_matkul),
+                    'nama_dosen'      => 'Ditentukan saat generate jadwal',
+                    'kelas'           => $kelasDefault,
+                    'kapasitas_kelas' => $jumlahMahasiswaDefault,
+                    'tahun_ajaran'    => $tahunAjaran,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+
+                DB::table('kelas_matkul')->insert([
+                    'kode_matkul'      => $matkul->kode_matkul,
+                    'nama_kelas'       => $kelasDefault,
+                    'kode_rombel'      => $kodeKelas,
+                    'jumlah_mahasiswa' => $jumlahMahasiswaDefault,
+                    'kode_semester'    => $matkul->kode_semester,
+                    'tahun_ajaran'     => $tahunAjaran,
+                    'kode_prodi'       => $matkul->kode_prodi,
+                    'created_at'       => now(),
+                    'updated_at'       => now(),
+                ]);
             }
-
-            $kelasDefault = 'A';
-            $kodeKelas = $matkul->kode_matkul . $kelasDefault;
-            $jumlahMahasiswaDefault = 40;
-
-            DB::table('kelas_matkul')->insert([
-                'kode_matkul'      => $matkul->kode_matkul,
-                'nama_kelas'       => $kelasDefault,
-                'kode_rombel'      => $kodeKelas,
-                'jumlah_mahasiswa' => $jumlahMahasiswaDefault,
-                'kode_semester'    => $matkul->kode_semester,
-                'tahun_ajaran'     => $tahunAjaran,
-                'kode_prodi'       => $matkul->kode_prodi,
-                'created_at'       => now(),
-                'updated_at'       => now(),
-            ]);
         }
 
         $kelasMatkulList = DB::table('kelas_matkul')
@@ -1706,7 +1831,7 @@ class PenjadwalankuliahController extends Controller
 
         return [
             'success' => true,
-            'message' => 'Data kelas berhasil disiapkan. Relasi dosen tidak disimpan di Manage Kelas; dosen akan dipilih otomatis saat generate jadwal.',
+            'message' => 'Data kelas berhasil disiapkan dan disinkronkan dari Kelola Kelas.',
         ];
     }
 
@@ -1754,10 +1879,7 @@ class PenjadwalankuliahController extends Controller
                 ->with('status', 'Harap mengisi data ruang terlebih dahulu!');
         }
 
-        if (DB::table('waktu')->count() == 0) {
-            return redirect('/managewaktu')
-                ->with('status', 'Harap mengisi data waktu terlebih dahulu!');
-        }
+
 
         $algoritma_proses = [];
         $execution_time = [];
@@ -1808,16 +1930,22 @@ class PenjadwalankuliahController extends Controller
         }
 
         if ($request->has('hari')) {
-            $getKodeJamByHari = DB::table('waktu')
-                ->where('kode_hari', $request->get('hari'))
-                ->get();
-
+            // waktu/jam tables removed - return generated time slots from 07:00 to 17:15
             $allJamByKodeJam = [];
+            $slotMulai = 7 * 60; // 07:00 in minutes
+            $batasMenit = 17 * 60 + 15; // 17:15
+            $slotIdx = 1;
 
-            foreach ($getKodeJamByHari as $key => $jam) {
-                $allJamByKodeJam[$key] = DB::table('jam')
-                    ->where('kode_jam', $jam->kode_jam)
-                    ->first();
+            while ($slotMulai < $batasMenit) {
+                $jam = str_pad(floor($slotMulai / 60), 2, '0', STR_PAD_LEFT) . ':' . str_pad($slotMulai % 60, 2, '0', STR_PAD_LEFT);
+                // Skip lunch
+                if ($slotMulai >= 12 * 60 && $slotMulai < 13 * 60) {
+                    $slotMulai += 50;
+                    continue;
+                }
+                $allJamByKodeJam[$slotIdx] = (object)['kode_jam' => $slotIdx, 'jam' => $jam];
+                $slotMulai += 50;
+                $slotIdx++;
             }
 
             echo json_encode([
@@ -1839,6 +1967,19 @@ class PenjadwalankuliahController extends Controller
 
     public function generatejadwal(Request $request)
     {
+        $this->jamMulaiSetting = $request->jam_mulai ?? '07:00';
+        $this->jamTerakhirSetting = $request->jam_terakhir_mulai ?? '17:00';
+        $this->durasiSksSetting = (int) ($request->durasi_sks ?? 50);
+        $this->jedaSetting = (int) ($request->jeda ?? 10);
+        $this->istirahatMulaiSetting = $request->istirahat_mulai ?? '12:00';
+        $this->istirahatSelesaiSetting = $request->istirahat_selesai ?? '13:00';
+
+        $jamMulaiSetting = $this->jamMulaiSetting;
+        $durasiSksSetting = $this->durasiSksSetting;
+        $jedaSetting = $this->jedaSetting;
+        $istirahatMulaiSetting = $this->istirahatMulaiSetting;
+        $istirahatSelesaiSetting = $this->istirahatSelesaiSetting;
+
         // Versi GA murni min-bentrok.
         // Tetap memakai populasi, fitness, seleksi, crossover, mutasi, elitism, dan repair operator.
         ini_set('memory_limit', '1536M');
@@ -1942,31 +2083,11 @@ class PenjadwalankuliahController extends Controller
         }
 
         $ruangTable = DB::table('ruang')->get();
-        $waktuTable = DB::table('waktu')->get();
-
-        if (count($ruangTable) == 0) {
-            return redirect('/manageruang')->with('status', 'Harap mengisi data ruang terlebih dahulu!');
-        }
-
-        if (count($waktuTable) == 0) {
-            return redirect('/managewaktu')->with('status', 'Harap mengisi data waktu terlebih dahulu!');
-        }
-
-        $maxSks = DB::table('matkul')
-            ->where('tahun_ajaran', $tahunAjaran)
-            ->where('kode_semester', $kodeSemester)
-            ->max('sks');
-
-        if (count($this->getKodeWaktuValidBySks($maxSks ?: 1)) == 0) {
-            return redirect('/managewaktu')->with('status', 'Tidak ada slot waktu yang bisa dipakai. Atur ulang data jam/waktu agar perkuliahan selesai maksimal ' . $this->getBatasJamSelesaiKuliah() . '.');
-        }
-
-        $firstKodeWaktu = $waktuTable[0]->kode_waktu;
-        $lastKodeWaktu = $waktuTable[count($waktuTable) - 1]->kode_waktu;
+        $waktuTable = []; // Not used anymore
+        
         $kodeHariAktifKuliah = $this->getKodeHariAktifKuliah();
-
         if (count($kodeHariAktifKuliah) == 0) {
-            return redirect('/managewaktu')->with('status', 'Data hari aktif Senin sampai Jumat belum lengkap. Pastikan tabel hari memiliki Senin, Selasa, Rabu, Kamis, dan Jumat.');
+            return redirect('/managehari')->with('status', 'Data hari aktif Senin sampai Jumat belum lengkap. Pastikan tabel hari memiliki Senin, Selasa, Rabu, Kamis, dan Jumat.');
         }
 
         // === PRELOAD: Muat semua data referensi ke memori ===
@@ -1982,31 +2103,24 @@ class PenjadwalankuliahController extends Controller
             }
         }
 
-        $jam = $request->jam;
+        // waktu/jam tables removed. Priority is now hari-based.
         $kode_waktu = [];
-
         foreach ((array) $hari as $key => $value) {
-            $waktuDipilih = DB::table('waktu')
-                ->where('kode_hari', $value)
-                ->where('kode_jam', $jam[$key] ?? null)
-                ->first();
-
-            if ($waktuDipilih) {
-                $kode_waktu[] = $waktuDipilih->kode_waktu;
-            }
+            $kode_waktu[$key] = $value; // store kode_hari directly
         }
 
         foreach ((array) $kelas as $key => $value) {
             if (isset($kode_waktu[$key])) {
                 $prioritas_kelas[] = [
-                    'id_kelas' => $value,
-                    'kode_waktu' => $kode_waktu[$key]
+                    'id_kelas'   => $value,
+                    'kode_hari'  => $kode_waktu[$key],
+                    'kode_waktu' => $kode_waktu[$key], // kept for backward compat
                 ];
             }
         }
 
-        $randomKodeRuang = function ($kode_prodi, $jumlah_mahasiswa, $jenis_matkul = null) {
-            $ruangList = $this->getRuangAlternatifValid($kode_prodi, $jumlah_mahasiswa, $jenis_matkul);
+        $randomKodeRuang = function ($kode_prodi, $jumlah_mahasiswa, $jenis_matkul = null, $nama_matkul = null) {
+            $ruangList = $this->getRuangAlternatifValid($kode_prodi, $jumlah_mahasiswa, $jenis_matkul, $nama_matkul);
 
             $allKodeRuang = [];
 
@@ -2050,181 +2164,227 @@ class PenjadwalankuliahController extends Controller
             ];
         }
 
-        $individuWithDetail = function ($individu) use ($blockingByDosenHari) {
+        $individuWithDetail = function ($individu) use ($blockingByDosenHari, $jamMulaiSetting, $durasiSksSetting, $jedaSetting, $istirahatMulaiSetting, $istirahatSelesaiSetting) {
             $individuWithDetail = [];
 
             for ($i = 0; $i < count($individu); $i++) {
                 $individuWithDetail[$i] = [];
+                $roomDayBuckets = [];
 
                 for ($j = 0; $j < count($individu[$i]); $j++) {
                     $idKelas = $individu[$i][$j][0];
                     $kodeRuang = $individu[$i][$j][1];
-                    $kodeWaktu = $individu[$i][$j][2];
+                    $kodeHari = $individu[$i][$j][2];
 
                     $kelasMatkul = $this->getCachedKelasMatkul($idKelas);
+                    $kodeDosenList = $this->getKodeDosenListByIdKelas($idKelas);
+                    $ruang = $this->getCachedRuang($kodeRuang);
+                    $hari = $this->getCachedHari($kodeHari);
 
-                    if (!$kelasMatkul) {
-                        continue;
-                    }
-
-                    $kodeDosenList = $this->getKodeDosenListByIdKelas($kelasMatkul->id_kelas);
-
-                    if (count($kodeDosenList) < 2) {
+                    if (!$kelasMatkul || count($kodeDosenList) < 1 || !$ruang || !$hari) {
+                        $individuWithDetail[$i][$j] = [
+                            'id_kelas' => $idKelas,
+                            'kode_matkul' => $kelasMatkul->kode_matkul ?? '',
+                            'kode_dosen' => [
+                                'kode' => $kodeDosenList[0] ?? '',
+                                'list' => $kodeDosenList,
+                                'clash' => 1,
+                                'blocked' => 0
+                            ],
+                            'kode_kelas' => $idKelas,
+                            'nama_kelas' => $kelasMatkul->nama_kelas ?? '',
+                            'kode_rombel' => $kelasMatkul->kode_rombel ?? '-',
+                            'kelas_clash' => 1,
+                            'jumlah_mahasiswa' => $kelasMatkul->jumlah_mahasiswa ?? 0,
+                            'jumlah_sks' => 1,
+                            'jam_selesai' => '07:50',
+                            'time_invalid' => 1,
+                            'nama_ruang' => [
+                                'kode' => $ruang->nama_ruang ?? '',
+                                'kode_ruang' => $kodeRuang,
+                                'kapasitas' => $ruang->kapasitas ?? 0,
+                                'capacity_invalid' => 1,
+                                'room_type_mismatch' => 1,
+                                'clash' => 1
+                            ],
+                            'kode_hari' => $kodeHari,
+                            'kode_jam' => '07:00',
+                            'jam_mulai' => '07:00',
+                            'jenis_matkul' => 'teori'
+                        ];
                         continue;
                     }
 
                     $matkul = $this->getCachedMatkul($kelasMatkul->kode_matkul, $kelasMatkul->tahun_ajaran);
-
                     if (!$matkul) {
                         $matkul = $this->getCachedMatkul($kelasMatkul->kode_matkul);
                     }
-
-                    if (!$matkul) {
-                        continue;
-                    }
-
-                    $ruang = $this->getCachedRuang($kodeRuang);
-
-                    $waktu = $this->getCachedWaktu($kodeWaktu);
-
-                    if (!$ruang || !$waktu) {
-                        continue;
-                    }
-
-                    $kodeHari = $waktu->kode_hari;
-                    $kodeJam = $waktu->kode_jam;
-
-                    $hari = $this->getCachedHari($kodeHari);
-
-                    $jam = $this->getCachedJam($kodeJam);
-
-                    if (!$hari || !$jam) {
-                        continue;
-                    }
-
-                    $jumlahSks = $matkul->sks;
-                    $jamMulai = substr($jam->jam, 0, 5);
-                    $jamSelesai = $this->hitungJamSelesai($jamMulai, $jumlahSks);
-                    $isTimeInvalid = $this->jamToMinutes($jamSelesai) > $this->jamToMinutes($this->getBatasJamSelesaiKuliah()) ? 1 : 0;
-
-                    $isBlocked = 0;
-                    $namaHariBlocking = strtolower(trim((string) $hari->nama_hari));
-                    $namaHariBlocking = str_replace(["'", '`', chr(0xE2).chr(0x80).chr(0x99)], '', $namaHariBlocking);
-
-                    foreach ($kodeDosenList as $kodeDosenCek) {
-                        $blockingList = $blockingByDosenHari[$kodeDosenCek][$namaHariBlocking] ?? [];
-
-                        foreach ($blockingList as $b) {
-                            $blockingMulai = $b['mulai'];
-                            $blockingSelesai = $b['selesai'];
-
-                            if (
-                                ($jamMulai >= $blockingMulai && $jamMulai < $blockingSelesai) ||
-                                ($jamSelesai > $blockingMulai && $jamSelesai <= $blockingSelesai) ||
-                                ($jamMulai <= $blockingMulai && $jamSelesai >= $blockingSelesai)
-                            ) {
-                                $isBlocked = 1;
-                                break 2;
-                            }
-                        }
-                    }
-
-                    $kapasitasInvalid = $kelasMatkul->jumlah_mahasiswa > $ruang->kapasitas ? 1 : 0;
-
-                    // Cek kesesuaian tipe ruang dengan jenis matkul
+                    $jumlahSks = $matkul ? $matkul->sks : 1;
                     $jenisMatkul = $this->getJenisMatkulByKelasMatkul($kelasMatkul);
-                    $tipeRuang = $ruang->tipe_ruang ?? 'reguler';
-                    $roomTypeMismatch = 0;
-                    if ($jenisMatkul === 'praktikum' && $tipeRuang !== 'laboratorium') {
-                        $roomTypeMismatch = 1;
-                    } elseif ($jenisMatkul === 'teori' && $tipeRuang === 'laboratorium') {
-                        $roomTypeMismatch = 1;
+                    $namaMatkul = $matkul->nama_matkul ?? $this->getNamaMatkulByKelasMatkul($kelasMatkul);
+
+                    $key = $kodeRuang . '_' . $kodeHari;
+                    if (!isset($roomDayBuckets[$key])) {
+                        $roomDayBuckets[$key] = [];
                     }
 
-                    $individuWithDetail[$i][] = [
-                        'id_kelas' => $kelasMatkul->id_kelas,
-                        'kode_matkul' => $kelasMatkul->kode_matkul,
-                        'kode_dosen' => [
-                            'kode' => $kodeDosenList[0],
-                            'list' => $kodeDosenList,
-                            'clash' => 0,
-                            'blocked' => $isBlocked
-                        ],
-                        'kode_kelas' => $kelasMatkul->id_kelas,
-                        'nama_kelas' => $kelasMatkul->nama_kelas,
-                        'kode_rombel' => $kelasMatkul->kode_rombel ?? '-',
-                        'kelas_clash' => 0,
-                        'jumlah_mahasiswa' => $kelasMatkul->jumlah_mahasiswa,
-                        'jumlah_sks' => $jumlahSks,
-                        'jam_selesai' => $jamSelesai,
-                        'time_invalid' => $isTimeInvalid,
-                        'nama_ruang' => [
-                            'kode' => $ruang->nama_ruang,
-                            'kode_ruang' => $ruang->kode_ruang,
-                            'kapasitas' => $ruang->kapasitas,
-                            'capacity_invalid' => $kapasitasInvalid,
-                            'room_type_mismatch' => $roomTypeMismatch,
-                            'clash' => 0
-                        ],
-                        'kode_hari' => $kodeHari,
-                        'kode_jam' => $kodeJam
+                    $roomDayBuckets[$key][] = [
+                        'j_index' => $j,
+                        'id_kelas' => $idKelas,
+                        'kelasMatkul' => $kelasMatkul,
+                        'kodeDosenList' => $kodeDosenList,
+                        'ruang' => $ruang,
+                        'hari' => $hari,
+                        'jumlahSks' => $jumlahSks,
+                        'jenisMatkul' => $jenisMatkul,
+                        'namaMatkul' => $namaMatkul,
                     ];
                 }
-            }
 
-            // Cek bentrok dibuat berbasis index, bukan double loop penuh O(n^2).
-            // Ini tetap mengevaluasi fitness GA yang sama, tetapi jauh lebih cepat pada data besar.
-            for ($i = 0; $i < count($individuWithDetail); $i++) {
-                $indexDosen = [];
-                $indexRuang = [];
-                $indexRombel = [];
+                // Process each room-day bucket
+                foreach ($roomDayBuckets as $key => $bucket) {
+                    usort($bucket, function ($a, $b) {
+                        return $a['id_kelas'] <=> $b['id_kelas'];
+                    });
 
-                for ($j = 0; $j < count($individuWithDetail[$i]); $j++) {
-                    $row = $individuWithDetail[$i][$j];
-                    $kodeHari = $row['kode_hari'];
-                    $mulai = (int) $row['kode_jam'];
-                    $selesai = $mulai + max(1, (int) $row['jumlah_sks']) - 1;
+                    $currentJam = $jamMulaiSetting;
 
-                    for ($slot = $mulai; $slot <= $selesai; $slot++) {
-                        foreach (($row['kode_dosen']['list'] ?? []) as $kodeDosenIndex) {
-                            $keyDosen = $kodeDosenIndex . '|' . $kodeHari . '|' . $slot;
-                            $indexDosen[$keyDosen][] = $j;
+                    foreach ($bucket as $item) {
+                        $j = $item['j_index'];
+                        $kelasMatkul = $item['kelasMatkul'];
+                        $ruang = $item['ruang'];
+                        $hari = $item['hari'];
+                        $jumlahSks = $item['jumlahSks'];
+                        $jenisMatkul = $item['jenisMatkul'];
+
+                        $mulaiMinutes = $this->jamToMinutes($currentJam);
+                        $durasiTotal = $jumlahSks * $durasiSksSetting;
+                        $selesaiMinutes = $mulaiMinutes + $durasiTotal;
+
+                        $istirahatMulaiMinutes = $this->jamToMinutes($istirahatMulaiSetting);
+                        $istirahatSelesaiMinutes = $this->jamToMinutes($istirahatSelesaiSetting);
+
+                        if ($mulaiMinutes < $istirahatMulaiMinutes && $selesaiMinutes > $istirahatMulaiMinutes) {
+                            $mulaiMinutes = $istirahatSelesaiMinutes;
+                            $selesaiMinutes = $mulaiMinutes + $durasiTotal;
+                        } elseif ($mulaiMinutes >= $istirahatMulaiMinutes && $mulaiMinutes < $istirahatSelesaiMinutes) {
+                            $mulaiMinutes = $istirahatSelesaiMinutes;
+                            $selesaiMinutes = $mulaiMinutes + $durasiTotal;
                         }
 
-                        $kodeRuangIndex = $row['nama_ruang']['kode_ruang'] ?? null;
-                        if ($kodeRuangIndex) {
-                            $keyRuang = $kodeRuangIndex . '|' . $kodeHari . '|' . $slot;
-                            $indexRuang[$keyRuang][] = $j;
+                        $isCapacityInvalid = $kelasMatkul->jumlah_mahasiswa > $ruang->kapasitas ? 1 : 0;
+                        $batasMulaiMenit = $this->jamToMinutes($this->jamTerakhirSetting);
+                        $isTimeInvalid = 0;
+
+                        if ($mulaiMinutes > $batasMulaiMenit) {
+                            $mulaiMinutes = $batasMulaiMenit + 1;
+                            $selesaiMinutes = $mulaiMinutes + $durasiTotal;
+                            $isTimeInvalid = 1;
+                            $currentJam = $this->minutesToJam($mulaiMinutes);
+                        } else {
+                            $nextMulaiMinutes = $selesaiMinutes + $jedaSetting;
+                            $currentJam = $this->minutesToJam($nextMulaiMinutes);
                         }
 
-                        $kodeRombelIndex = $row['kode_rombel'] ?? '-';
-                        if ($kodeRombelIndex != '-') {
-                            $keyRombel = $kodeRombelIndex . '|' . $kodeHari . '|' . $slot;
-                            $indexRombel[$keyRombel][] = $j;
+                        $jamMulaiFinal = $this->minutesToJam($mulaiMinutes);
+                        $jamSelesaiFinal = $this->minutesToJam($selesaiMinutes);
+
+                        $tipeRuang = $ruang->tipe_ruang ?? 'reguler';
+                        $roomTypeMismatch = 0;
+                        if ($jenisMatkul === 'praktikum' && $tipeRuang !== 'laboratorium') {
+                            $roomTypeMismatch = 1;
+                        } elseif ($jenisMatkul === 'teori' && $tipeRuang === 'laboratorium') {
+                            $roomTypeMismatch = 1;
+                        }
+
+                        $isFisikaDasar = $this->isMatkulFisikaDasar($item['namaMatkul']);
+                        $isFisikaRuang = $this->isRuangFisika($ruang->nama_ruang);
+                        if ($isFisikaDasar && !$isFisikaRuang) {
+                            $roomTypeMismatch = 1;
+                        } elseif (!$isFisikaDasar && $isFisikaRuang) {
+                            $roomTypeMismatch = 1;
+                        }
+
+                        $isBlocked = 0;
+                        if (count($blockingByDosenHari) > 0) {
+                            if ($this->isCandidateBlockedByDosen($item['kodeDosenList'], $hari->kode_hari, $jamMulaiFinal, $jamSelesaiFinal)) {
+                                $isBlocked = 1;
+                            }
+                        }
+
+                        $individuWithDetail[$i][$j] = [
+                            'id_kelas' => $kelasMatkul->id_kelas,
+                            'kode_matkul' => $kelasMatkul->kode_matkul,
+                            'kode_dosen' => [
+                                'kode' => $item['kodeDosenList'][0],
+                                'list' => $item['kodeDosenList'],
+                                'clash' => 0,
+                                'blocked' => $isBlocked
+                            ],
+                            'kode_kelas' => $kelasMatkul->id_kelas,
+                            'nama_kelas' => $kelasMatkul->nama_kelas,
+                            'kode_rombel' => $kelasMatkul->kode_rombel ?? '-',
+                            'kelas_clash' => 0,
+                            'jumlah_mahasiswa' => $kelasMatkul->jumlah_mahasiswa,
+                            'jumlah_sks' => $jumlahSks,
+                            'jam_selesai' => $jamSelesaiFinal,
+                            'time_invalid' => $isTimeInvalid,
+                            'nama_ruang' => [
+                                'kode' => $ruang->nama_ruang,
+                                'kode_ruang' => $ruang->kode_ruang,
+                                'kapasitas' => $ruang->kapasitas,
+                                'capacity_invalid' => $isCapacityInvalid,
+                                'room_type_mismatch' => $roomTypeMismatch,
+                                'clash' => 0
+                            ],
+                            'kode_hari' => $hari->kode_hari,
+                            'kode_jam' => $jamMulaiFinal,
+                            'jam_mulai' => $jamMulaiFinal,
+                            'jenis_matkul' => $jenisMatkul
+                        ];
+                    }
+                }
+
+                // Check overlaps for Dosen and Rombel
+                $length = count($individuWithDetail[$i]);
+                for ($a = 0; $a < $length; $a++) {
+                    if (!isset($individuWithDetail[$i][$a])) {
+                        continue;
+                    }
+                    for ($b = $a + 1; $b < $length; $b++) {
+                        if (!isset($individuWithDetail[$i][$b])) {
+                            continue;
+                        }
+                        $rowA = $individuWithDetail[$i][$a];
+                        $rowB = $individuWithDetail[$i][$b];
+
+                        if ($rowA['kode_hari'] !== $rowB['kode_hari']) {
+                            continue;
+                        }
+
+                        $mulaiA = $this->jamToMinutes($rowA['jam_mulai']);
+                        $selesaiA = $this->jamToMinutes($rowA['jam_selesai']);
+                        $mulaiB = $this->jamToMinutes($rowB['jam_mulai']);
+                        $selesaiB = $this->jamToMinutes($rowB['jam_selesai']);
+
+                        $waktuBentrok = $mulaiA < $selesaiB && $mulaiB < $selesaiA;
+                        if (!$waktuBentrok) {
+                            continue;
+                        }
+
+                        if ($this->isDosenBentrok($rowA['kode_dosen']['list'], $rowB['kode_dosen']['list'])) {
+                            $individuWithDetail[$i][$a]['kode_dosen']['clash'] = 1;
+                            $individuWithDetail[$i][$b]['kode_dosen']['clash'] = 1;
+                        }
+
+                        if ($rowA['kode_rombel'] !== '-' && $rowA['kode_rombel'] === $rowB['kode_rombel']) {
+                            $individuWithDetail[$i][$a]['kelas_clash'] = 1;
+                            $individuWithDetail[$i][$b]['kelas_clash'] = 1;
                         }
                     }
                 }
 
-                foreach ($indexDosen as $rows) {
-                    if (count($rows) <= 1) continue;
-                    foreach (array_unique($rows) as $idx) {
-                        $individuWithDetail[$i][$idx]['kode_dosen']['clash'] = 1;
-                    }
-                }
-
-                foreach ($indexRuang as $rows) {
-                    if (count($rows) <= 1) continue;
-                    foreach (array_unique($rows) as $idx) {
-                        $individuWithDetail[$i][$idx]['nama_ruang']['clash'] = 1;
-                    }
-                }
-
-                foreach ($indexRombel as $rows) {
-                    if (count($rows) <= 1) continue;
-                    foreach (array_unique($rows) as $idx) {
-                        $individuWithDetail[$i][$idx]['kelas_clash'] = 1;
-                    }
-                }
+                ksort($individuWithDetail[$i]);
             }
 
             return $individuWithDetail;
@@ -2247,11 +2407,12 @@ class PenjadwalankuliahController extends Controller
                         $hr = $this->getCachedHari($row['kode_hari']);
                         $hariNama = $hr ? $hr->nama_hari : null;
                         $jm = $this->getCachedJam($row['kode_jam']);
-                        $jamValue = $jm ? $jm->jam : null;
+                        $jamValue = $jm ? $jm->jam : ($row['jam_mulai'] ?? null);
                     } else {
                         $matkulNama = DB::table('matkul')->where('kode_matkul', $row['kode_matkul'])->value('nama_matkul');
                         $hariNama = DB::table('hari')->where('kode_hari', $row['kode_hari'])->value('nama_hari');
-                        $jamValue = DB::table('jam')->where('kode_jam', $row['kode_jam'])->value('jam');
+                        // jam table removed - use jam_mulai stored in row
+                        $jamValue = $row['jam_mulai'] ?? null;
                     }
 
                     $codeIntoNameIndividuDetail[$i][$j] = [
@@ -2286,32 +2447,53 @@ class PenjadwalankuliahController extends Controller
 
                 for ($j = 0; $j < count($individuWithDetail[$i]); $j++) {
                     if ($individuWithDetail[$i][$j]['kode_dosen']['clash'] == 1) {
-                        $CD[$i] += 12;
+                        $CD[$i] += 300;
                     }
 
                     if ($individuWithDetail[$i][$j]['nama_ruang']['clash'] == 1) {
-                        $CR[$i] += 10;
+                        $CR[$i] += 300;
                     }
 
                     if (($individuWithDetail[$i][$j]['kelas_clash'] ?? 0) == 1) {
-                        $CK[$i] += 10;
+                        $CK[$i] += 300;
                     }
 
                     if (($individuWithDetail[$i][$j]['kode_dosen']['blocked'] ?? 0) == 1) {
-                        $CD[$i] += 20;
+                        $CD[$i] += 300;
                     }
 
                     if (($individuWithDetail[$i][$j]['nama_ruang']['capacity_invalid'] ?? 0) == 1) {
-                        $CR[$i] += 8;
+                        $CR[$i] += 300;
                     }
 
                     if (($individuWithDetail[$i][$j]['time_invalid'] ?? 0) == 1) {
-                        $CK[$i] += 15;
+                        $CK[$i] += 150;
                     }
 
                     // Penalty jika tipe ruang tidak cocok dengan jenis mata kuliah
                     if (($individuWithDetail[$i][$j]['nama_ruang']['room_type_mismatch'] ?? 0) == 1) {
-                        $CR[$i] += 12;
+                        $CR[$i] += 300;
+                    }
+
+                    // Penalty jika praktikum tidak di hari sabtu/minggu (day >= 6), atau teori di weekend
+                    $jenisMatkulTemp = $individuWithDetail[$i][$j]['jenis_matkul'] ?? 'teori';
+                    $dayTemp = $individuWithDetail[$i][$j]['kode_hari'] ?? 1;
+                    if ($jenisMatkulTemp === 'praktikum') {
+                        if ($dayTemp < 6) {
+                            $CK[$i] += 150;
+                        }
+                    } else {
+                        if ($dayTemp >= 6) {
+                            $CK[$i] += 150;
+                        }
+                    }
+
+                    // Penalty jika matkul 3 SKS tidak di pagi hari
+                    if (($individuWithDetail[$i][$j]['jumlah_sks'] ?? 0) == 3) {
+                        $jamMulaiTemp = $individuWithDetail[$i][$j]['jam_mulai'] ?? null;
+                        if ($jamMulaiTemp && !$this->isSlotPagi($jamMulaiTemp)) {
+                            $CK[$i] += 300;
+                        }
                     }
                 }
 
@@ -2394,36 +2576,37 @@ class PenjadwalankuliahController extends Controller
                 }
 
                 $jenisMatkul = $this->getJenisMatkulByKelasMatkul($kelasMatkul);
+                $namaMatkul = $this->getNamaMatkulByKelasMatkul($kelasMatkul);
 
                 $kodeRuang = $randomKodeRuang(
                     $kelasMatkul->kode_prodi,
                     $kelasMatkul->jumlah_mahasiswa,
-                    $jenisMatkul
+                    $jenisMatkul,
+                    $namaMatkul
                 );
 
                 $jumlahSksKelas = $this->getJumlahSksByKelasMatkul($kelasMatkul);
 
-                if ($prioritas && $this->isKodeWaktuValidBySks($prioritas['kode_waktu'], $jumlahSksKelas)) {
-                    $kodeWaktu = $prioritas['kode_waktu'];
+                if ($prioritas && isset($prioritas['kode_hari'])) {
+                    $kodeHari = $prioritas['kode_hari'];
                 } else {
-                    $targetKodeHari = $kodeHariAktifKuliah[mt_rand(0, count($kodeHariAktifKuliah) - 1)];
-                    $kodeWaktu = $this->randomKodeWaktuValidBySksAndHari($jumlahSksKelas, $targetKodeHari);
-                }
-
-                if (!$kodeWaktu) {
-                    continue;
+                    if ($jenisMatkul === 'praktikum') {
+                        $kodeHari = mt_rand(6, 7);
+                    } else {
+                        $kodeHari = $kodeHariAktifKuliah[mt_rand(0, count($kodeHariAktifKuliah) - 1)];
+                    }
                 }
 
                 $individu[$i][] = [
                     $kelasMatkul->id_kelas,
                     $kodeRuang,
-                    $kodeWaktu
+                    $kodeHari
                 ];
             }
 
             // Repair awal hanya untuk sebagian populasi.
             // Kalau semua individu langsung direpair, populasi menjadi terlalu mirip dan hasil akhir cenderung sama terus.
-            $jumlahRepairAwal = max(2, (int) ceil($jumlahIndividu * 0.45));
+            $jumlahRepairAwal = max(5,(int) ceil($jumlahIndividu * 0.75));
             if ($i < $jumlahRepairAwal || mt_rand(1, 100) <= 15) {
                 $individu[$i] = $this->repairIndividuMinBentrok($individu[$i], $prioritas_kelas, false);
             }
@@ -2709,26 +2892,25 @@ class PenjadwalankuliahController extends Controller
                 }
 
                 $jumlahSksKelas = $this->getJumlahSksByKelasMatkul($kelasMatkul);
-                $targetKodeHariMutasi = $kodeHariAktifKuliah[mt_rand(0, count($kodeHariAktifKuliah) - 1)];
-                $kodeWaktuMutasi = $this->randomKodeWaktuValidBySksAndHari($jumlahSksKelas, $targetKodeHariMutasi);
+                $jenisMatkulMutasi = $this->getJenisMatkulByKelasMatkul($kelasMatkul);
+                if ($jenisMatkulMutasi === 'praktikum') {
+                    $targetKodeHariMutasi = mt_rand(6, 7);
+                } else {
+                    $targetKodeHariMutasi = $kodeHariAktifKuliah[mt_rand(0, count($kodeHariAktifKuliah) - 1)];
+                }
 
                 foreach ($prioritas_kelas as $p) {
-                    if ($idKelas == $p['id_kelas'] && $this->isKodeWaktuValidBySks($p['kode_waktu'], $jumlahSksKelas)) {
-                        $kodeWaktuMutasi = $p['kode_waktu'];
+                    if ($idKelas == $p['id_kelas'] && isset($p['kode_hari'])) {
+                        $targetKodeHariMutasi = $p['kode_hari'];
                         break;
                     }
                 }
 
-                if (!$kodeWaktuMutasi) {
-                    continue;
-                }
-
-                $jenisMatkulMutasi = $this->getJenisMatkulByKelasMatkul($kelasMatkul);
-
+                $namaMatkulMutasi = $this->getNamaMatkulByKelasMatkul($kelasMatkul);
                 $mutatedChro = [
                     $idKelas,
-                    $randomKodeRuang($kelasMatkul->kode_prodi, $kelasMatkul->jumlah_mahasiswa, $jenisMatkulMutasi),
-                    $kodeWaktuMutasi
+                    $randomKodeRuang($kelasMatkul->kode_prodi, $kelasMatkul->jumlah_mahasiswa, $jenisMatkulMutasi, $namaMatkulMutasi),
+                    $targetKodeHariMutasi
                 ];
 
                 if ($simpanProsesAlgoritma && $generasi < $maxProsesDetail) {
@@ -2748,7 +2930,7 @@ class PenjadwalankuliahController extends Controller
             $indexIndividuRepair = array_values(array_unique($indexIndividuRepair));
 
             // Repair tetap dipakai sebagai operator GA, tetapi dibatasi agar setting 50/500/75 tidak timeout.
-            $maksRepairIndividuPerGenerasi = min(8, max(3, (int) ceil($jumlahIndividu * 0.15)));
+            $maksRepairIndividuPerGenerasi = min(25,max(5,(int) ceil($jumlahIndividu * 0.25)));
             if (count($indexIndividuRepair) > $maksRepairIndividuPerGenerasi) {
                 shuffle($indexIndividuRepair);
                 $indexIndividuRepair = array_slice($indexIndividuRepair, 0, $maksRepairIndividuPerGenerasi);
@@ -2772,15 +2954,20 @@ class PenjadwalankuliahController extends Controller
                     $randomChromosomes = [];
                     foreach ($kelasMatkulTable as $kelasMatkulImm) {
                         $jumlahSksImm = $this->getJumlahSksByKelasMatkul($kelasMatkulImm);
-                        $kodeHariImm = $kodeHariAktifKuliah[mt_rand(0, count($kodeHariAktifKuliah) - 1)];
+                        $jenisMatkulImm = $this->getJenisMatkulByKelasMatkul($kelasMatkulImm);
+                        if ($jenisMatkulImm === 'praktikum') {
+                            $kodeHariImm = mt_rand(6, 7);
+                        } else {
+                            $kodeHariImm = $kodeHariAktifKuliah[mt_rand(0, count($kodeHariAktifKuliah) - 1)];
+                        }
                         $kodeWaktuImm = $this->randomKodeWaktuValidBySksAndHari($jumlahSksImm, $kodeHariImm);
                         if (!$kodeWaktuImm) {
                             continue;
                         }
-                        $jenisMatkulImm = $this->getJenisMatkulByKelasMatkul($kelasMatkulImm);
+                        $namaMatkulImm = $this->getNamaMatkulByKelasMatkul($kelasMatkulImm);
                         $randomChromosomes[] = [
                             $kelasMatkulImm->id_kelas,
-                            $randomKodeRuang($kelasMatkulImm->kode_prodi, $kelasMatkulImm->jumlah_mahasiswa, $jenisMatkulImm),
+                            $randomKodeRuang($kelasMatkulImm->kode_prodi, $kelasMatkulImm->jumlah_mahasiswa, $jenisMatkulImm, $namaMatkulImm),
                             $kodeWaktuImm
                         ];
                     }
@@ -2807,7 +2994,7 @@ class PenjadwalankuliahController extends Controller
         // Repair final agresif pada individu terbaik hasil GA.
         // Dicoba beberapa kali dengan variasi acak agar sisa bentrok tidak selalu berada pada mata kuliah/ruang/jam yang sama.
         if (count($bestIndividu) > 0) {
-            $jumlahPercobaanFinalRepair = 14;
+            $jumlahPercobaanFinalRepair = 50;
             $bestFinalFitness = $bestFitness;
             $bestFinalIndividu = $bestIndividu;
             $bestFinalJadwal = $bestJadwal;
@@ -2966,25 +3153,24 @@ class PenjadwalankuliahController extends Controller
         }
 
         foreach ($fixJadwal as $row) {
-            $jam_masuk = DB::table('jam')->where('kode_jam', $row['kode_jam'])->value('jam');
-            $jam_keluar = $this->hitungJamSelesai($jam_masuk, $row['jumlah_sks']);
-
-            if (!$this->isJamSelesaiValid($jam_masuk, $row['jumlah_sks'])) {
-                continue;
-            }
+            $jam_masuk = $row['jam_mulai'] ?? (isset($row['kode_jam']) && strpos($row['kode_jam'], ':') !== false ? substr($row['kode_jam'], 0, 5) : '07:00');
+            $jam_keluar = $row['jam_selesai'] ?? $this->hitungJamSelesai($jam_masuk, $row['jumlah_sks']);
 
             $kodeDosenList = $row['kode_dosen']['list'] ?? [$row['kode_dosen']['kode']];
             $kodeDosenList = array_values(array_unique(array_filter($kodeDosenList)));
 
-            if (count($kodeDosenList) < 2) {
+            if (count($kodeDosenList) < 1) {
                 continue;
             }
 
-            $kodeDosenList = $this->pilihDuaDosenAcak($kodeDosenList, 2);
             $kodeDosenGabungan = implode(', ', $kodeDosenList);
 
+            $matkulRecord = DB::table('matkul')->where('kode_matkul', $row['kode_matkul'])->first();
+
             $jadwalId = DB::table('jadwal')->insertGetId([
-                'matkul' => DB::table('matkul')->where('kode_matkul', $row['kode_matkul'])->value('nama_matkul'),
+                'matkul' => $matkulRecord->nama_matkul ?? $row['kode_matkul'],
+                'jenis_matkul' => $matkulRecord->jenis_matkul ?? 'teori',
+                'tipe_matkul' => $matkulRecord->tipe_matkul ?? 'wajib',
                 'dosen' => $kodeDosenGabungan,
                 'kelas' => $row['nama_kelas'],
                 'jumlah_sks' => $row['jumlah_sks'],
@@ -3063,13 +3249,17 @@ class PenjadwalankuliahController extends Controller
 
         $selected_tahun_ajaran = session('selected_tahun_ajaran', '');
 
+        // Ambil data semua dosen untuk ditampilkan di halaman hasil jadwal
+        $dosen = DB::table('dosen')->orderBy('kode_dosen')->get();
+
         return view('penjadwalankuliah.hasiljadwal', compact(
             'user_login',
             'jadwal',
             'countRequest',
             'semester',
             'tahun_ajaran',
-            'selected_tahun_ajaran'
+            'selected_tahun_ajaran',
+            'dosen'
         ));
     }
 }

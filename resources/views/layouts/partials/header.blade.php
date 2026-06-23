@@ -42,7 +42,8 @@
   <link rel="stylesheet" href="{{ asset('/AdminLTE/plugins/summernote/summernote-bs4.min.css') }}">
 
   <!-- custom css -->
-  <link rel="stylesheet" href="{{ asset('/css/style.css') }}">
+  <link rel="stylesheet" href="{{ asset('/css/style.css') }}?v=1.0.3">
+  <link rel="stylesheet" href="{{ asset('/css/sidebar_custom.css') }}?v=1.0.0">
 
   {{-- tambahan css per halaman (optional) --}}
   @stack('styles')
@@ -54,7 +55,7 @@
   --}}
 </head>
 
-<body class="hold-transition sidebar-mini layout-fixed layout-footer-fixed">
+<body class="hold-transition sidebar-mini layout-fixed">
 <div class="wrapper">
 
   <!-- Preloader -->

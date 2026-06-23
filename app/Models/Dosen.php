@@ -19,6 +19,7 @@ class Dosen extends Model
         'nama',
         'nidn',
         'program_studi',
+        'no_whatsapp',
     ];
 
     public function getNamaProperAttribute()

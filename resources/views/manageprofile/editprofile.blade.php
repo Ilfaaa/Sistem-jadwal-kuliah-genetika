@@ -3,35 +3,13 @@
 @section('title','Edit Profile | Sistem Penjadwalan Kuliah')
 
 @section('content')
-  <!-- Content Header (Page header) -->
-  <div class="content-header">
-    <div class="container-fluid">
-      <div class="row mb-2">
-        <div class="col-sm-6">
-          <h1 class="m-0">Edit Profile</h1>
-        </div>
-        <div class="col-sm-6">
-          <ol class="breadcrumb float-sm-right">
-            <li class="breadcrumb-item">
-              <a href="/home/dashboard"><i class="fas fa-igloo mr-2"></i>Home</a>
-            </li>
-            <li class="breadcrumb-item">
-              <a href="/myprofile">My Profile</a>
-            </li>
-            <li class="breadcrumb-item active">Edit Profile</li>
-          </ol>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- /.content-header -->
-
+  
   <!-- Main content -->
-  <section class="content">
+  <section class="content d-flex flex-column justify-content-center" style="min-height: 80vh;">
     <div class="container-fluid">
 
-      <div class="row">
-        <div class="col-12 col-md-6">
+      <div class="row justify-content-center">
+        <div class="col-12 col-md-8">
           @if (session('status'))
             <div class="alert alert-success alert-dismissible fade show" role="alert">
               {{ session('status') }}
@@ -43,12 +21,12 @@
         </div>
       </div>
 
-      <div class="row">
+      <div class="row justify-content-center">
         <div class="col-12 col-md-8">
 
           <div class="card text-choTheme">
             <div class="card-header bg-greenTheme">
-              <h3 class="card-title text-whiteTheme">Form Edit Profile</h3>
+              <h3 class="card-title text-whiteTheme">Form Ubah Profile</h3>
             </div>
 
             <form action="/editprofile" method="post" enctype="multipart/form-data">
@@ -90,7 +68,7 @@
                     <div class="col-sm-3 mb-2 mb-sm-0">
                       <img
                         src="{{ asset('/img/profile/' . $user_login->image) }}"
-                        class="img-thumbnail"
+                        class="img-thumbnail rounded-circle shadow-sm" style="width: 120px; height: 120px; object-fit: cover;"
                         alt="Profile image"
                       >
                     </div>
@@ -138,3 +116,40 @@
     </div>
   </section>
 @endsection
+
+
+@push('scripts')
+<style>
+    /* Make the file input and label show pointer cursor */
+    .custom-file-input, .custom-file-label, .custom-file-label::after {
+        cursor: pointer !important;
+        transition: all 0.3s ease-in-out;
+    }
+    
+    /* Hover effect for the "Browse" pseudo-element */
+    .custom-file-input:hover ~ .custom-file-label::after,
+    .custom-file-label:hover::after {
+        background-color: #0056b3 !important; /* A nice interactive blue */
+        color: #ffffff !important;
+    }
+</style>
+
+@push('scripts')
+<script>
+    // Update label with file name
+    $('.custom-file-input').on('change', function() {
+        let fileName = $(this).val().split('\\').pop();
+        $(this).next('.custom-file-label').addClass("selected").html(fileName);
+        
+        // Preview image
+        if (this.files && this.files[0]) {
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                $('.img-thumbnail').attr('src', e.target.result);
+            }
+            reader.readAsDataURL(this.files[0]);
+        }
+    });
+</script>
+@endpush
+

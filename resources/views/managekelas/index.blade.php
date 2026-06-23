@@ -51,11 +51,13 @@
       </div>
     </div>
 
+    @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
     <div class="mb-3">
       <a href="/managekuliah/managekelas/create" class="btn btn-outline-greenTheme mb-2">
         <i class="fas fa-plus-circle mr-1"></i>Tambah Data Kelas
       </a>
     </div>
+    @endif
 
     <div class="alert alert-info">
       <strong>Catatan:</strong> Menu Manage Kelas hanya digunakan untuk mengelola data kelas, mata kuliah, rombel, dan kapasitas.
@@ -103,7 +105,9 @@
                     <th scope="col">Kelas</th>
                     <th scope="col">Kapasitas</th>
                     <th scope="col">Status Dosen</th>
+                    @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
                     <th scope="col">Action</th>
+                    @endif
                   </tr>
                 </thead>
 
@@ -130,10 +134,11 @@
                       <td scope="row">
                         <span class="badge bg-info">Ditentukan saat generate jadwal</span>
                       </td>
+                      @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
                       <td scope="row">
                         <form action="/managekuliah/managekelas/{{ $k->kode_kelas }}/{{ $tahunUrl }}/edit" method="get" class="d-inline">
-                          <button type="submit" class="badge bg-lime">
-                            <i class="fas fa-edit"></i>&nbsp;edit
+                          <button type="submit" class="badge badge-editTheme">
+                            <i class="fas fa-edit"></i>&nbsp;ubah
                           </button>
                         </form>
 
@@ -145,6 +150,7 @@
                           </button>
                         </form>
                       </td>
+                      @endif
                     </tr>
                   @endforeach
                 </tbody>

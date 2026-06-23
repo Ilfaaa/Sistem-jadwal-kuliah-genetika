@@ -74,24 +74,42 @@ class ManagekuliahController extends Controller
                 ->orderBy('kode_kuliah')
                 ->get();
 
-            // Jika jumlah data tidak sama, kita rebuild (logika lama kamu)
-            if ($kelasList->count() !== $kuliahExisting->count()) {
-                DB::table('kuliah')->where('tahun_ajaran', $tahunAjaran)->delete();
+            // Sync incremental: hanya tambah/hapus yang perlu, TIDAK menghapus data yang masih valid
+            $existingKodeKelas = $kuliahExisting->pluck('kode_kelas')->toArray();
+            $activeKodeKelas = $kelasList->pluck('kode_kelas')->toArray();
+
+            // Hapus kuliah yang kelas-nya sudah tidak ada lagi
+            $toDelete = array_diff($existingKodeKelas, $activeKodeKelas);
+            if (!empty($toDelete)) {
+                DB::table('kuliah')
+                    ->where('tahun_ajaran', $tahunAjaran)
+                    ->whereIn('kode_kelas', $toDelete)
+                    ->delete();
+            }
+
+            // Tambah kuliah baru untuk kelas yang belum punya entry
+            $toAdd = array_diff($activeKodeKelas, $existingKodeKelas);
+            if (!empty($toAdd)) {
+                // Ambil kode_kuliah terakhir untuk numbering
+                $lastKodeKuliah = DB::table('kuliah')
+                    ->where('tahun_ajaran', $tahunAjaran)
+                    ->max('kode_kuliah') ?? 0;
 
                 $rowsInsert = [];
-                $no = 1;
+                $no = $lastKodeKuliah + 1;
 
                 foreach ($kelasList as $k) {
-                    // dari kode_kelas (mengikuti pola lama kamu)
+                    if (!in_array($k->kode_kelas, $toAdd)) {
+                        continue;
+                    }
+
                     $kodeMatkul = substr($k->kode_kelas, 0, -1);
                     $kodeProdi  = substr($k->kode_kelas, 0, -5);
 
-                    // dosen: cari kode dari nama
                     $kodeDosen = isset($dosenByNama[$k->nama_dosen])
                         ? $dosenByNama[$k->nama_dosen]->kode_dosen
                         : '';
 
-                    // semester: cari dari matkul (by nama matkul & tahun ajaran)
                     $kodeSemester = isset($matkulByNama[$k->nama_matkul])
                         ? $matkulByNama[$k->nama_matkul]->kode_semester
                         : '';
@@ -114,8 +132,10 @@ class ManagekuliahController extends Controller
                 if (!empty($rowsInsert)) {
                     DB::table('kuliah')->insert($rowsInsert);
                 }
+            }
 
-                // refresh
+            // Refresh data setelah sync
+            if (!empty($toDelete) || !empty($toAdd)) {
                 $kuliahExisting = DB::table('kuliah')
                     ->where('tahun_ajaran', $tahunAjaran)
                     ->orderBy('kode_kuliah')

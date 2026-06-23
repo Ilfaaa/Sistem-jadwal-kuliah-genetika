@@ -96,6 +96,17 @@
                   <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
               </div>
+
+              <div class="form-group">
+                <label for="no_whatsapp">No. WhatsApp</label>
+                <input name="no_whatsapp" type="text"
+                       class="form-control @error('no_whatsapp') is-invalid @enderror"
+                       id="no_whatsapp" placeholder="Contoh: 08123456789"
+                       value="{{ old('no_whatsapp', $dosen->no_whatsapp) }}">
+                @error('no_whatsapp')
+                  <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+              </div>
             </div>
 
             <div class="card-footer">

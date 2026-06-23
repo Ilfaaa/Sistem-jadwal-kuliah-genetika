@@ -74,8 +74,38 @@
 {{-- PENTING: taruh stack scripts DI SINI (setelah semua plugin siap) --}}
 @stack('scripts')
 
+<!-- Global Lecturer Map for Tooltips -->
+<script>
+  window.lecturersMap = @json(\App\Models\Dosen::select('kode_dosen', 'nama')->get()->pluck('nama', 'kode_dosen')->toArray());
+</script>
+
 <!-- Custom javascript file (global) -->
 <script src="{{ asset('/js/script.js') }}"></script>
+
+<!-- Sidebar Dosen: Toggle & Search -->
+<script>
+  $(function () {
+    // Toggle dosen list expand/collapse
+    var $toggleBtn = $('#toggle-dosen-list');
+    var $dosenPanel = $('.treeview-dosen-info');
+    var $arrow = $('.arrow-dosen-info');
+
+    $toggleBtn.on('click', function (e) {
+      e.preventDefault();
+      $dosenPanel.slideToggle(250);
+      $arrow.toggleClass('rotate-90d');
+    });
+
+    // Live search filter
+    $('#sidebar-search-dosen').on('input', function () {
+      var keyword = $(this).val().toLowerCase().trim();
+      $('#sidebar-dosen-list .sidebar-dosen-item').each(function () {
+        var text = $(this).text().toLowerCase();
+        $(this).toggle(text.indexOf(keyword) > -1);
+      });
+    });
+  });
+</script>
 
 </body>
 </html>

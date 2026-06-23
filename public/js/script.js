@@ -73,7 +73,7 @@ $(document).ready(function () {
             <div class="col-md-12">
               <div class="card text-choThem">
                 <div class="card-header bg-greenTheme">
-                  <h3 class="card-title text-whiteTheme">
+                  <h3 class="card-title text-white text-bold">
                     Tabel Jadwal Perkuliahan Semester <b>Ganjil ${tahunAjaran}</b>
                     <a href="/home/export_excel/ganjil/${tahunAjaranLink}" class="badge bg-maroon ml-1" target="_blank">
                       <i class="far fa-file-excel mr-1"></i>EXCEL
@@ -127,7 +127,7 @@ $(document).ready(function () {
             <div class="col-md-12">
               <div class="card text-choThem">
                 <div class="card-header bg-greenTheme">
-                  <h3 class="card-title text-whiteTheme">
+                  <h3 class="card-title text-white text-bold">
                     Tabel Jadwal Perkuliahan Semester <b>Genap ${tahunAjaran}</b>
                     <a href="/home/export_excel/genap/${tahunAjaranLink}" class="badge bg-maroon ml-1" target="_blank">
                       <i class="far fa-file-excel mr-1"></i>EXCEL
@@ -414,13 +414,14 @@ $(document).ready(function () {
     $(".nav-treeview-container.treeview-kuliah").toggle(500);
   });
 
-  $("i.fa-angle-left.arrow-waktu").click(function (e) {
+  $(".menu-waktu-toggle").click(function (e) {
     e.preventDefault();
+    var arrow = $(this).find("i.fa-angle-left.arrow-waktu");
 
-    if ($(this).hasClass('rotate-n90d')) {
-      $(this).removeClass('rotate-n90d');
+    if (arrow.hasClass('rotate-n90d')) {
+      arrow.removeClass('rotate-n90d');
     } else {
-      $(this).addClass('rotate-n90d');
+      arrow.addClass('rotate-n90d');
     }
 
     $(".nav-treeview-container.treeview-waktu").toggle(500);
@@ -436,7 +437,28 @@ $(document).ready(function () {
     theme: 'bootstrap4'
   });
 
-  $('.my-colorpicker1').colorpicker();
+  if ($.isFunction($.fn.colorpicker)) {
+    $('.my-colorpicker1').colorpicker();
+  }
+
+  // Tooltip Dosen
+  function initDosenTooltips() {
+    $('.class-dosen-badge').each(function () {
+      var kode = $(this).attr('data-kode');
+      if (kode && window.lecturersMap && window.lecturersMap[kode]) {
+        var rawName = window.lecturersMap[kode];
+        // Title case the name
+        var titleName = rawName.toLowerCase().replace(/\b[a-z]/g, function(letter) {
+            return letter.toUpperCase();
+        });
+        $(this).attr('title', titleName);
+        $(this).attr('data-toggle', 'tooltip');
+        $(this).css('cursor', 'pointer');
+      }
+    });
+    $('[data-toggle="tooltip"]').tooltip();
+  }
+  initDosenTooltips();
 
 });
 

@@ -85,6 +85,17 @@
                 </div>
 
                 <div class="form-group">
+                  <label>Tipe Mata Kuliah</label>
+                  <select name="tipe_matkul" class="form-control select2bs4 @error('tipe_matkul') is-invalid @enderror" style="width: 100%;">
+                    <option value="wajib" {{ old('tipe_matkul', $matkul->tipe_matkul ?? 'wajib') == 'wajib' ? 'selected' : '' }}>Wajib</option>
+                    <option value="pilihan" {{ old('tipe_matkul', $matkul->tipe_matkul ?? 'wajib') == 'pilihan' ? 'selected' : '' }}>Pilihan</option>
+                  </select>
+                  @error('tipe_matkul')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
+                </div>
+
+                <div class="form-group">
                   <label>Dosen Pengampu</label>
                   <select name="dosen_pengampu[]" class="form-control select2bs4" multiple="multiple" style="width: 100%;">
                     @foreach($allDosen as $d)

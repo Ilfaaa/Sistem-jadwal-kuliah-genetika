@@ -237,6 +237,182 @@
       min-width: 1120px;
     }
   }
+
+  /* === Styles imported from hasiljadwal for weekly grid UI === */
+  .jadwal-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .jadwal-grid {
+    min-width: 1350px;
+    table-layout: fixed;
+    font-size: 13px;
+    margin-bottom: 0 !important;
+  }
+
+  .jadwal-grid th,
+  .jadwal-grid td {
+    text-align: center;
+    border: 1px solid #dee2e6 !important;
+  }
+
+  .jadwal-grid th {
+    background: #4b74ad;
+    color: #fff;
+    vertical-align: middle !important;
+  }
+
+  .jam-col {
+    width: 120px;
+    font-weight: 700;
+    background: #f8f9fa;
+    vertical-align: middle !important;
+  }
+
+  .jadwal-cell {
+    height: 108px;
+    min-height: 108px;
+    padding: 8px;
+    background: #fff;
+    vertical-align: top !important;
+  }
+
+  .jadwal-item {
+    border: 1px solid #d9e2ef;
+    border-radius: 8px;
+    padding: 7px;
+    margin-bottom: 6px;
+    background: #f8fbff;
+    text-align: left;
+    line-height: 1.35;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .03);
+    border-left: 4px solid #d9e2ef;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .jadwal-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, .08);
+  }
+
+  .jadwal-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .jadwal-item-wajib {
+    background: #BFDBFE;
+    border-left-color: #3b82f6;
+    border-color: #93c5fd;
+  }
+  .jadwal-item-wajib .jadwal-matkul {
+    color: #1e3a5f;
+  }
+  .jadwal-item-wajib .jadwal-dosen {
+    color: #1d4ed8;
+  }
+
+  .jadwal-item-pilihan {
+    background: #BBF7D0;
+    border-left-color: #22c55e;
+    border-color: #86efac;
+  }
+  .jadwal-item-pilihan .jadwal-matkul {
+    color: #14532d;
+  }
+  .jadwal-item-pilihan .jadwal-dosen {
+    color: #15803d;
+  }
+
+  .jadwal-item-praktikum {
+    background: #FED7AA;
+    border-left-color: #f97316;
+    border-color: #fdba74;
+  }
+  .jadwal-item-praktikum .jadwal-matkul {
+    color: #7c2d12;
+  }
+  .jadwal-item-praktikum .jadwal-dosen {
+    color: #c2410c;
+  }
+
+  .jadwal-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    padding: 10px 16px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    font-size: 13px;
+  }
+
+  .jadwal-legend-title {
+    font-weight: 700;
+    color: #333;
+    margin-right: 4px;
+  }
+
+  .jadwal-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .jadwal-legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,.12);
+    flex-shrink: 0;
+  }
+
+  .legend-wajib {
+    background: #BFDBFE;
+  }
+  .legend-pilihan {
+    background: #BBF7D0;
+  }
+  .legend-praktikum {
+    background: #FED7AA;
+  }
+
+  .jadwal-matkul {
+    font-weight: 700;
+    text-transform: capitalize;
+    color: #111;
+  }
+
+  .jadwal-meta {
+    font-size: 12px;
+    color: #333;
+  }
+
+  .jadwal-dosen {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0b5ed7;
+  }
+
+  .empty-cell {
+    height: 108px;
+    min-height: 108px;
+    color: #aaa;
+    background: #fafafa;
+    vertical-align: middle !important;
+  }
+
+  .weekend-empty {
+    height: 108px;
+    min-height: 108px;
+    background: #fafafa !important;
+    color: inherit;
+    text-align: center !important;
+    vertical-align: middle !important;
+    padding: 0 !important;
+  }
 </style>
 
 @php
@@ -283,6 +459,32 @@
   if (isset($algoritma_proses) && is_array($algoritma_proses) && array_key_exists('final', $algoritma_proses)) {
       $finalProses = $algoritma_proses['final'];
   }
+
+  $hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+
+  $daysMap = [];
+  foreach (DB::table('hari')->get() as $h) {
+      $daysMap[$h->kode_hari] = $formatHari($h->nama_hari);
+  }
+
+  $matkulMap = [];
+  foreach (DB::table('matkul')->get() as $m) {
+      $matkulMap[$m->kode_matkul] = $m;
+  }
+
+  $jamToMinutes = function ($jam) {
+      if (!$jam) {
+          return 0;
+      }
+      $jam = substr((string) $jam, 0, 5);
+      if (strpos($jam, ':') === false) {
+          return 0;
+      }
+      $parts = explode(':', $jam);
+      $hour = isset($parts[0]) ? (int) $parts[0] : 0;
+      $minute = isset($parts[1]) ? (int) $parts[1] : 0;
+      return ($hour * 60) + $minute;
+  };
 @endphp
 
 <div class="content-header">
@@ -310,7 +512,7 @@
   <div class="container-fluid">
 
     @if (session('status'))
-      <div class="row">
+      <div class="row justify-content-center">
         <div class="col-md-6">
           <div class="alert alert-dismissible fade show bg-lime" role="alert">
             {{ session('status') }}
@@ -322,7 +524,7 @@
       </div>
     @endif
 
-    <div class="row">
+    <div class="row justify-content-center">
       <div class="col-md-6">
         <div class="card text-choTheme">
           <div class="card-header bg-greenTheme">
@@ -404,6 +606,52 @@
                 <div class="ga-form-help">
                   Mengatur seberapa sering sistem menggabungkan beberapa kemungkinan jadwal untuk membuat solusi baru.
                   Nilai tinggi membuat sistem lebih aktif mencoba kombinasi.
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label>Jam Mulai Kuliah</label>
+                    <input type="time" name="jam_mulai" class="form-control" value="07:00" required>
+                    <div class="ga-form-help">Waktu paling pagi perkuliahan dimulai.</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label>Jam Terakhir Mulai Kuliah</label>
+                    <input type="time" name="jam_terakhir_mulai" class="form-control" value="17:00" required>
+                    <div class="ga-form-help">Batas paling lambat perkuliahan boleh mulai (contoh: 17:00).</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label>Durasi 1 SKS (Menit)</label>
+                    <input type="number" name="durasi_sks" class="form-control" value="50" min="10" required>
+                    <div class="ga-form-help">Berapa lama 1 SKS berlangsung (contoh: 50 menit).</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label>Jeda Antar Kelas (Menit)</label>
+                    <input type="number" name="jeda" class="form-control" value="10" min="0" required>
+                    <div class="ga-form-help">Istirahat antar mata kuliah.</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label>Mulai Istirahat Siang</label>
+                    <input type="time" name="istirahat_mulai" class="form-control" value="12:00" required>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label>Selesai Istirahat Siang</label>
+                    <input type="time" name="istirahat_selesai" class="form-control" value="13:00" required>
+                  </div>
                 </div>
               </div>
 
@@ -514,9 +762,7 @@
           </div>
         </div>
       </div>
-    @endif
-
-    @if(isset($fixJadwal))
+    @endif    @if(isset($fixJadwal))
       @if(count($fixJadwalSiapPakai) > 0)
 
         <div class="row mt-4">
@@ -528,122 +774,192 @@
               </div>
 
               @foreach($fixJadwalSiapPakai as $individu)
-                <div class="ga-table-card">
-                  <div class="ga-table-wrapper">
-                    <table class="table table-bordered table-hover text-center bg-light ga-table">
-                      <colgroup>
-                        <col class="ga-col-no">
-                        <col class="ga-col-matkul">
-                        <col class="ga-col-dosen">
-                        <col class="ga-col-kelas">
-                        <col class="ga-col-ruang">
-                        <col class="ga-col-kapasitas">
-                        <col class="ga-col-hari">
-                        <col class="ga-col-jam">
-                        <col class="ga-col-status">
-                      </colgroup>
+                @php
+                  $individuRows = collect($individu);
 
-                      <thead>
-                        <tr>
-                          <th colspan="9">Jadwal {{ $loop->iteration }}</th>
-                        </tr>
-                        <tr>
-                          <th>No</th>
-                          <th>Mata Kuliah</th>
-                          <th>Dosen Pengajar</th>
-                          <th>Kelas</th>
-                          <th>Ruang</th>
-                          <th>Kapasitas</th>
-                          <th>Hari</th>
-                          <th>Jam</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
+                  $individuRows = $individuRows->sortBy(function ($item) use ($jamToMinutes) {
+                      $mulai = isset($item['jam_mulai']) ? $item['jam_mulai'] : '00:00';
+                      $selesai = isset($item['jam_selesai']) ? $item['jam_selesai'] : '00:00';
+                      $hari = isset($item['kode_hari']) ? (int) $item['kode_hari'] : 0;
+                      return str_pad($jamToMinutes($mulai), 4, '0', STR_PAD_LEFT)
+                          . '|'
+                          . str_pad($jamToMinutes($selesai), 4, '0', STR_PAD_LEFT)
+                          . '|'
+                          . $hari;
+                  })->values();
 
-                      <tbody>
-                        @forelse($individu as $kromosom)
-                          @php
-                            $namaMatkul = DB::table('matkul')->where('kode_matkul', $kromosom['kode_matkul'] ?? null)->value('nama_matkul');
+                  $jamList = $individuRows->map(function ($item) use ($jamToMinutes) {
+                      $mulai = isset($item['jam_mulai']) ? substr((string) $item['jam_mulai'], 0, 5) : '07:00';
+                      $selesai = isset($item['jam_selesai']) ? substr((string) $item['jam_selesai'], 0, 5) : '07:50';
+                      return [
+                          'key' => $mulai . '|' . $selesai,
+                          'mulai_menit' => $jamToMinutes($mulai),
+                          'keluar_menit' => $jamToMinutes($selesai),
+                      ];
+                  })->unique('key')->sortBy('mulai_menit')->pluck('key')->values();
+                @endphp
 
-                            $kodeDosenList = $kromosom['kode_dosen']['list'] ?? [];
-                            $kodeDosenList = array_values(array_unique(array_filter($kodeDosenList)));
+                <div class="card card-outline card-success mt-4">
+                  <div class="card-header bg-greenTheme text-white text-bold">
+                    <h3 class="card-title text-white text-bold">Alternatif Jadwal {{ $loop->iteration }}</h3>
+                  </div>
 
-                            if (count($kodeDosenList) == 0 && isset($kromosom['kode_dosen']['kode'])) {
-                              $kodeDosenList = [$kromosom['kode_dosen']['kode']];
-                            }
+                  {{-- Keterangan Warna / Legend --}}
+                  <div style="padding: 14px 16px 0;">
+                    <div class="jadwal-legend">
+                      <span class="jadwal-legend-title"><i class="fas fa-palette mr-1"></i> Keterangan:</span>
+                      <span class="jadwal-legend-item">
+                        <span class="jadwal-legend-color legend-wajib"></span> Matkul Wajib
+                      </span>
+                      <span class="jadwal-legend-item">
+                        <span class="jadwal-legend-color legend-pilihan"></span> Matkul Pilihan
+                      </span>
+                      <span class="jadwal-legend-item">
+                        <span class="jadwal-legend-color legend-praktikum"></span> Praktikum
+                      </span>
+                    </div>
+                  </div>
 
-                            $kodeDosenList = array_slice($kodeDosenList, 0, 2);
-
-                            $namaHariDb = DB::table('hari')->where('kode_hari', $kromosom['kode_hari'] ?? null)->value('nama_hari');
-                            $namaHari = $formatHari($namaHariDb ?? '-');
-                            $jamMulai = DB::table('jam')->where('kode_jam', $kromosom['kode_jam'] ?? null)->value('jam');
-
-                            $isDosenClash = ($kromosom['kode_dosen']['clash'] ?? 0) == 1;
-                            $isBlocked = ($kromosom['kode_dosen']['blocked'] ?? 0) == 1;
-                            $isRuangClash = ($kromosom['nama_ruang']['clash'] ?? 0) == 1;
-                            $isCapacityInvalid = ($kromosom['nama_ruang']['capacity_invalid'] ?? 0) == 1;
-                            $isKelasClash = ($kromosom['kelas_clash'] ?? 0) == 1;
-                            $isTimeInvalid = ($kromosom['time_invalid'] ?? 0) == 1;
-                          @endphp
-
+                  <div class="card-body p-0">
+                    <div class="jadwal-table-wrapper">
+                      <table class="table table-bordered jadwal-grid">
+                        <thead>
                           <tr>
-                            <td>{{ $loop->iteration }}</td>
-                            <td>{{ $namaMatkul ?? ($kromosom['kode_matkul'] ?? '-') }}</td>
-                            <td class="{{ $isDosenClash || $isBlocked ? 'ga-cell-danger' : '' }}">
-                              <div class="ga-dosen-list">
-                                @forelse($kodeDosenList as $kodeDosen)
-                                  <span class="ga-dosen-item">{{ $kodeDosen }}</span>
-                                @empty
-                                  <span class="ga-dosen-item">-</span>
-                                @endforelse
-                              </div>
-                            </td>
-                            <td class="{{ $isKelasClash ? 'ga-cell-danger' : '' }}">
-                              {{ $kromosom['nama_kelas'] ?? '-' }}
-                            </td>
-                            <td class="{{ $isRuangClash || $isCapacityInvalid ? 'ga-cell-danger' : '' }}">
-                              {{ ucwords($kromosom['nama_ruang']['kode'] ?? '-') }}
-                            </td>
-                            <td>{{ $kromosom['nama_ruang']['kapasitas'] ?? '-' }}</td>
-                            <td>{{ $namaHari }}</td>
-                            <td>{{ $jamMulai ? substr((string) $jamMulai, 0, 5) : '-' }}</td>
-                            <td>
-                              @if($isBlocked)
-                                <span class="badge bg-maroon ga-status-valid">Dosen Blocking</span>
-                              @elseif($isDosenClash)
-                                <span class="badge bg-maroon ga-status-valid">Bentrok Dosen</span>
-                              @elseif($isKelasClash)
-                                <span class="badge bg-maroon ga-status-valid">Bentrok Kelas</span>
-                              @elseif($isRuangClash)
-                                <span class="badge bg-maroon ga-status-valid">Bentrok Ruang</span>
-                              @elseif($isCapacityInvalid)
-                                <span class="badge bg-maroon ga-status-valid">Kapasitas Kurang</span>
-                              @elseif($isTimeInvalid)
-                                <span class="badge bg-maroon ga-status-valid">Lewat Jam</span>
-                              @else
-                                <span class="badge bg-lime ga-status-valid">Valid</span>
-                              @endif
-                            </td>
+                            <th class="jam-col">Jam</th>
+                            @foreach($hariList as $hari)
+                              <th>{{ $hari }}</th>
+                            @endforeach
                           </tr>
-                        @empty
-                          <tr>
-                            <td colspan="9" class="text-danger font-weight-bold">
-                              Jadwal kosong. Pastikan setiap kelas memiliki 2 dosen, ruang tersedia, dan waktu perkuliahan sudah lengkap.
-                            </td>
-                          </tr>
-                        @endforelse
+                        </thead>
 
-                        <tr>
-                          <th colspan="9">
-                            <div class="ga-action-row">
-                              <a href="/hasilgenerate/{{ $loop->index }}" class="btn bg-maroon text-center">
-                                <i class="fas fa-table mr-1"></i> Gunakan Jadwal
-                              </a>
-                            </div>
-                          </th>
-                        </tr>
-                      </tbody>
-                    </table>
+                        <tbody>
+                          @forelse($jamList as $jamKey)
+                            @php
+                              [$jamMasuk, $jamKeluar] = explode('|', $jamKey);
+
+                              $adaJadwalDiSlot = $individuRows->filter(function ($item) use ($jamMasuk, $jamKeluar) {
+                                  $itemMulai = isset($item['jam_mulai']) ? substr((string) $item['jam_mulai'], 0, 5) : '07:00';
+                                  $itemKeluar = isset($item['jam_selesai']) ? substr((string) $item['jam_selesai'], 0, 5) : '07:50';
+                                  return $itemMulai == $jamMasuk && $itemKeluar == $jamKeluar;
+                              })->count() > 0;
+                            @endphp
+
+                            @if($adaJadwalDiSlot)
+                              <tr>
+                                <td class="jam-col">
+                                  {{ $jamMasuk }}<br>
+                                  <span style="font-weight: 400;">s/d</span><br>
+                                  {{ $jamKeluar }}
+                                </td>
+
+                                @foreach($hariList as $hari)
+                                  @php
+                                    $items = $individuRows->filter(function ($item) use ($hari, $jamMasuk, $jamKeluar, $daysMap) {
+                                        $itemHari = $daysMap[$item['kode_hari']] ?? '-';
+                                        $itemMulai = isset($item['jam_mulai']) ? substr((string) $item['jam_mulai'], 0, 5) : '07:00';
+                                        $itemKeluar = isset($item['jam_selesai']) ? substr((string) $item['jam_selesai'], 0, 5) : '07:50';
+                                        return $itemHari == $hari
+                                            && $itemMulai == $jamMasuk
+                                            && $itemKeluar == $jamKeluar;
+                                    })->sortBy(function ($item) {
+                                        return ($item['nama_kelas'] ?? '') . '|' . ($item['kode_matkul'] ?? '');
+                                    });
+
+                                    $isWeekend = in_array($hari, ['Sabtu', 'Minggu']);
+                                  @endphp
+
+                                  @if($items->count() > 0)
+                                    <td class="jadwal-cell">
+                                      @foreach($items as $item)
+                                        @php
+                                          $mkRecord = $matkulMap[$item['kode_matkul']] ?? null;
+                                          $jenisItem = strtolower($item['jenis_matkul'] ?? ($mkRecord->jenis_matkul ?? 'teori'));
+                                          $tipeItem  = strtolower($mkRecord->tipe_matkul ?? 'wajib');
+
+                                          if ($jenisItem === 'praktikum') {
+                                              $warnaClass = 'jadwal-item-praktikum';
+                                          } elseif ($tipeItem === 'pilihan') {
+                                              $warnaClass = 'jadwal-item-pilihan';
+                                          } else {
+                                              $warnaClass = 'jadwal-item-wajib';
+                                          }
+
+                                          $kodeDosenList = $item['kode_dosen']['list'] ?? [];
+                                          $kodeDosenList = array_values(array_unique(array_filter($kodeDosenList)));
+                                          if (count($kodeDosenList) == 0 && isset($item['kode_dosen']['kode'])) {
+                                              $kodeDosenList = [$item['kode_dosen']['kode']];
+                                          }
+                                          $kodeDosenList = array_slice($kodeDosenList, 0, 2);
+                                          $dosenStr = implode(', ', $kodeDosenList);
+
+                                          $isDosenClash = ($item['kode_dosen']['clash'] ?? 0) == 1;
+                                          $isBlocked = ($item['kode_dosen']['blocked'] ?? 0) == 1;
+                                          $isRuangClash = ($item['nama_ruang']['clash'] ?? 0) == 1;
+                                          $isCapacityInvalid = ($item['nama_ruang']['capacity_invalid'] ?? 0) == 1;
+                                          $isKelasClash = ($item['kelas_clash'] ?? 0) == 1;
+                                          $isTimeInvalid = ($item['time_invalid'] ?? 0) == 1;
+                                        @endphp
+                                        <div class="jadwal-item {{ $warnaClass }}">
+                                          <div class="jadwal-matkul">
+                                            {{ $mkRecord->nama_matkul ?? $item['kode_matkul'] }}
+                                          </div>
+                                          <div class="jadwal-dosen">
+                                            {{ $dosenStr }}
+                                          </div>
+                                          <div class="jadwal-meta">
+                                            Kelas {{ $item['nama_kelas'] ?? '-' }} | {{ $item['jumlah_sks'] ?? '-' }} SKS
+                                          </div>
+                                          <div class="jadwal-meta">
+                                            {{ \App\Models\Ruang::formatName($item['nama_ruang']['kode'] ?? '-') }}
+                                          </div>
+                                          <div class="mt-1 text-center">
+                                            @if($isBlocked)
+                                              <span class="badge bg-maroon">Dosen Blocking</span>
+                                            @elseif($isDosenClash)
+                                              <span class="badge bg-maroon">Bentrok Dosen</span>
+                                            @elseif($isKelasClash)
+                                              <span class="badge bg-maroon">Bentrok Kelas</span>
+                                            @elseif($isRuangClash)
+                                              <span class="badge bg-maroon">Bentrok Ruang</span>
+                                            @elseif($isCapacityInvalid)
+                                              <span class="badge bg-maroon">Kapasitas Kurang</span>
+                                            @elseif($isTimeInvalid)
+                                              <span class="badge bg-maroon">Lewat Jam</span>
+                                            @else
+                                              <span class="badge bg-lime">Valid</span>
+                                            @endif
+                                          </div>
+                                        </div>
+                                      @endforeach
+                                    </td>
+                                  @else
+                                    @if($isWeekend)
+                                      <td class="weekend-empty"></td>
+                                    @else
+                                      <td class="empty-cell">-</td>
+                                    @endif
+                                  @endif
+                                @endforeach
+                              </tr>
+                            @endif
+                          @empty
+                            <tr>
+                              <td colspan="8" class="jadwal-empty-message">
+                                Belum ada data jadwal.
+                              </td>
+                            </tr>
+                          @endforelse
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div class="card-footer">
+                    <div class="ga-action-row">
+                      <a href="/hasilgenerate/{{ $loop->index }}" class="btn bg-maroon text-center">
+                        <i class="fas fa-table mr-1"></i> Gunakan Jadwal
+                      </a>
+                    </div>
                   </div>
                 </div>
               @endforeach

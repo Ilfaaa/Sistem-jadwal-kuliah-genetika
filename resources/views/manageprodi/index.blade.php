@@ -50,9 +50,11 @@
         </div>
       </div>
 
+      @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
       <a href="/managekuliah/manageprodi/create" class="btn btn-outline-greenTheme mb-2">
         <i class="fas fa-plus-circle mr-1"></i>Tambah Data Program Studi
       </a>
+      @endif
 
       <div class="row">
         <div class="col-12">
@@ -90,7 +92,9 @@
                     <th scope="col">NO</th>
                     <th scope="col">Nama Prodi</th>
                     <th scope="col">Kode Prodi</th>
+                    @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
                     <th scope="col">Action</th>
+                    @endif
                   </tr>
                 </thead>
 
@@ -108,9 +112,10 @@
                       <td scope="row">{{ $loop->iteration }}</td>
                       <td scope="row">{{ ucwords($p->nama_prodi) }}</td>
                       <td scope="row">{{ strtoupper($p->kode_prodi) }}</td>
+                      @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
                       <td scope="row">
-                        <a href="/managekuliah/manageprodi/{{ $p->id_prodi }}/edit" class="badge bg-lime">
-                          <i class="fas fa-edit"></i>&nbsp;edit
+                        <a href="/managekuliah/manageprodi/{{ $p->id_prodi }}/edit" class="badge badge-editTheme">
+                          <i class="fas fa-edit"></i>&nbsp;ubah
                         </a>
 
                         <form action="/managekuliah/manageprodi/{{ $p->id_prodi }}" method="post" class="d-inline">
@@ -125,6 +130,7 @@
                           </button>
                         </form>
                       </td>
+                      @endif
                     </tr>
                   @endforeach
                 </tbody>

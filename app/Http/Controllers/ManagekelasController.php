@@ -95,7 +95,8 @@ class ManagekelasController extends Controller
 
     private function cleanupRelasiDosenLama($kodeKelas, $tahunAjaran)
     {
-        // Aman untuk menjaga konsep baru: dosen tidak lagi melekat di Manage Kelas.
+        // Hanya bersihkan relasi dosen di kelas_matkul_dosen.
+        // TIDAK menghapus data kuliah agar data kuliah lama tetap utuh.
         $idKelas = $this->getIdKelasMatkul($kodeKelas, $tahunAjaran);
 
         if ($idKelas) {
@@ -103,11 +104,6 @@ class ManagekelasController extends Controller
                 ->where('id_kelas', $idKelas)
                 ->delete();
         }
-
-        DB::table('kuliah')
-            ->where('kode_kelas', $kodeKelas)
-            ->where('tahun_ajaran', $tahunAjaran)
-            ->delete();
     }
 
     public function index(Request $request)
@@ -199,7 +195,7 @@ class ManagekelasController extends Controller
         }
 
         if ($request->has('prodi')) {
-            $prodi = explode('-', $request->get('prodi'));
+            $prodi = explode('-', $request->get('prodi'), 2);
             $tahun_ajaran = $request->get('tahun_ajaran');
 
             $matkulByProdiAndTahunAjaran = DB::table('matkul')
@@ -213,11 +209,19 @@ class ManagekelasController extends Controller
         }
 
         if ($request->has('matkul')) {
-            $matkul = explode('-', $request->get('matkul'));
+            $matkul = explode('-', $request->get('matkul'), 2);
+            $kodeMatkul = $matkul[0];
+            $namaMatkul = strtolower($matkul[1] ?? '');
             $tahun_ajaran = $request->get('tahun_ajaran');
 
+            $kelasLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
+            $possibleKodeKelas = array_map(function ($k) use ($kodeMatkul) {
+                return $kodeMatkul . $k;
+            }, $kelasLetters);
+
             $kelasByMatkulAndTahunAjaran = DB::table('kelas')
-                ->where('nama_matkul', strtolower($matkul[1]))
+                ->whereIn('kode_kelas', $possibleKodeKelas)
+                ->where('nama_matkul', $namaMatkul)
                 ->where('tahun_ajaran', $tahun_ajaran)
                 ->get();
 
@@ -251,11 +255,11 @@ class ManagekelasController extends Controller
             ]
         );
 
-        $prodi = explode('-', $request->prodi);
+        $prodi = explode('-', $request->prodi, 2);
         $kodeProdi = $prodi[0];
         $namaProdi = $prodi[1] ?? '';
 
-        $matkul = explode('-', $request->matkul);
+        $matkul = explode('-', $request->matkul, 2);
         $kodeMatkul = $matkul[0];
         $namaMatkul = $matkul[1] ?? '';
         $kelas = strtoupper($request->kelas);
@@ -291,9 +295,29 @@ class ManagekelasController extends Controller
             ->first();
 
         if ($existingKelas) {
-            return redirect()->back()
-                ->withInput()
-                ->with('kelas_exist', 'Data kelas tersebut sudah ada pada tahun ajaran yang dipilih.');
+            if (strtolower($existingKelas->nama_matkul) === strtolower($namaMatkul)) {
+                // True duplicate: same kode_kelas, same nama_matkul, same tahun_ajaran
+                return redirect()->back()
+                    ->withInput()
+                    ->with('kelas_exist', 'Data kelas tersebut sudah ada pada tahun ajaran yang dipilih.');
+            }
+
+            // Orphan data: kode_kelas exists but for a different (old) matkul name — update it
+            DB::table('kelas')
+                ->where('kode_kelas', $kodeKelas)
+                ->where('tahun_ajaran', $request->tahun_ajaran)
+                ->update([
+                    'nama_matkul'     => strtolower($namaMatkul),
+                    'nama_dosen'      => $this->labelDosenGenerate(),
+                    'kelas'           => $kelas,
+                    'kapasitas_kelas' => $request->kapasitas_kelas,
+                ]);
+
+            $this->ensureKelasMatkul($kodeKelas, $kelas, $request->kapasitas_kelas, $request->tahun_ajaran);
+            $this->cleanupRelasiDosenLama($kodeKelas, $request->tahun_ajaran);
+
+            return redirect('/managekuliah/managekelas')
+                ->with('status', 'Data kelas berhasil ditambahkan (data lama diperbarui). Dosen pengajar akan ditentukan otomatis saat generate jadwal.');
         }
 
         DB::table('kelas')->insert([
@@ -306,7 +330,6 @@ class ManagekelasController extends Controller
         ]);
 
         $this->ensureKelasMatkul($kodeKelas, $kelas, $request->kapasitas_kelas, $request->tahun_ajaran);
-        $this->cleanupRelasiDosenLama($kodeKelas, $request->tahun_ajaran);
 
         return redirect('/managekuliah/managekelas')
             ->with('status', 'Data kelas berhasil ditambahkan. Dosen pengajar akan ditentukan otomatis saat generate jadwal.');

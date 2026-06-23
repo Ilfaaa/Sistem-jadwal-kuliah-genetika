@@ -58,7 +58,7 @@
                 <td>{{ $item->dosen }}</td>
                 <td>{{ $item->kelas }}</td>
                 <td>{{ $item->jumlah_sks }}</td>
-                <td>{{ $item->nama_ruang }}</td>
+                <td>{{ \App\Models\Ruang::formatName($item->nama_ruang) }}</td>
                 <td>{{ $item->hari }}</td>
                 <td>{{ $item->jam_masuk }}</td>
                 <td>{{ $item->jam_keluar }}</td>

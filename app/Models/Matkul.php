@@ -17,6 +17,7 @@ class Matkul extends Model
         'nama_matkul',
         'sks',
         'jenis_matkul', // 'praktikum' atau 'teori'
+        'tipe_matkul',  // 'wajib' atau 'pilihan'
         'tahun_ajaran',
         'kode_prodi'
     ];

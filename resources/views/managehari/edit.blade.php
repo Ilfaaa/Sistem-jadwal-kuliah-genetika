@@ -16,7 +16,7 @@
             <a href="/home/dashboard"><i class="fas fa-igloo mr-2"></i>Home</a>
           </li>
           <li class="breadcrumb-item">
-            <a href="/managewaktu/managehari">Manage Hari</a>
+            <a href="/managehari">Manage Hari</a>
           </li>
           <li class="breadcrumb-item active">Edit Hari</li>
         </ol>
@@ -50,7 +50,7 @@
             <h3 class="card-title text-whiteTheme">Form Edit Hari</h3>
           </div>
 
-          <form method="post" action="/managewaktu/managehari/{{ $hari->kode_hari }}">
+          <form method="post" action="/managehari/{{ $hari->kode_hari }}">
             @method('patch')
             @csrf
 
@@ -88,7 +88,7 @@
             </div>
 
             <div class="card-footer">
-              <a href="/managewaktu/managehari" class="btn btn-outline-greenTheme">Kembali</a>
+              <a href="/managehari" class="btn btn-outline-greenTheme">Kembali</a>
               <button type="submit" class="btn btn-greenTheme float-right">Edit Hari</button>
             </div>
 

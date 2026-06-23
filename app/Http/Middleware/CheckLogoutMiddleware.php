@@ -16,8 +16,29 @@ class CheckLogoutMiddleware
      */
     public function handle(Request $request, Closure $next)
     {
-        if(!session('user_login')){
-            return redirect('/');
+        $publicRoutes = [
+            'managekuliah',
+            'managekuliah/keyword',
+            'managekuliah/manageprodi',
+            'managekuliah/manageprodi/keyword',
+            'managekuliah/managematkul',
+            'managekuliah/managematkul/keyword',
+            'managekuliah/managedosen',
+            'managekuliah/managedosen/keyword',
+            'managekuliah/managekelas',
+            'managekuliah/managekelas/keyword',
+        ];
+
+        $isPublic = false;
+        foreach ($publicRoutes as $route) {
+            if ($request->is($route)) {
+                $isPublic = true;
+                break;
+            }
+        }
+
+        if (!session('user_login') && !$isPublic) {
+            return redirect('/login');
         } 
         return $next($request);
     }

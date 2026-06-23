@@ -1,0 +1,104 @@
+/* Custom Sidebar & Navbar Polish */
+
+/* 1. Main Navbar Symmetrical Pill Buttons */
+.navbar-user-pill {
+  color: #EFECE3 !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 50px !important;
+  padding: 0 16px !important;
+  font-weight: 600 !important;
+  font-size: 0.88rem !important;
+  display: flex !important;
+  align-items: center !important;
+  transition: background 0.25s, border-color 0.25s !important;
+  margin-right: 8px;
+  height: 36px !important;
+  box-sizing: border-box !important;
+}
+
+.navbar-user-pill:hover,
+.navbar-user-pill:focus {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.navbar-hamburger-pill {
+  color: #EFECE3 !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 50% !important;
+  width: 36px !important;
+  height: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.25s, border-color 0.25s !important;
+  margin-left: 8px;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.navbar-hamburger-pill:hover,
+.navbar-hamburger-pill:focus {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* 2. Main Menu Items (Centered, Symmetrical Margin, Rounded Corners) */
+.main-sidebar .nav-sidebar .nav-item > .nav-link {
+  margin-left: 12px !important;
+  margin-right: 12px !important;
+  margin-top: 3px !important;
+  margin-bottom: 3px !important;
+  border-radius: 8px !important;
+  transition: all 0.3s !important;
+}
+
+/* 3. Sub-menu Container (Indented Group, Rounded Corners) */
+.main-sidebar .nav-sidebar .nav-treeview,
+.main-sidebar .nav-sidebar .nav-treeview-container {
+  background-color: rgba(0, 0, 0, 0.15) !important;
+  border-radius: 8px !important;
+  margin-left: 12px !important;
+  margin-right: 12px !important;
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  padding: 6px 0 !important;
+}
+
+/* 4. Sub-menu Link Items (Nested Spacing inside Container) */
+.main-sidebar .nav-sidebar .nav-treeview .nav-link,
+.main-sidebar .nav-sidebar .nav-treeview-container .nav-link {
+  color: #EFECE3 !important;
+  margin-left: 6px !important;
+  margin-right: 6px !important;
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
+  border-radius: 6px !important;
+  padding-left: 16px !important;
+}
+
+/* Hover style for sub-menu items */
+.main-sidebar .nav-sidebar .nav-treeview .nav-link:hover,
+.main-sidebar .nav-sidebar .nav-treeview-container .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #FFFFFF !important;
+}
+
+/* 5. Main Menu Active Highlight Style (Cream Background) */
+.main-sidebar .nav-sidebar > .nav-item > .nav-link.active {
+  background-color: #EFECE3 !important;
+  color: #3a5f96 !important;
+  font-weight: 700 !important;
+}
+
+/* 6. Sub-menu Active Highlight Style (Darker Cream Background) */
+.main-sidebar .nav-sidebar .nav-treeview .nav-link.active,
+.main-sidebar .nav-sidebar .nav-treeview-container .nav-link.active {
+  background-color: #D2CFC6 !important;
+  color: #3a5f96 !important;
+  font-weight: 700 !important;
+}

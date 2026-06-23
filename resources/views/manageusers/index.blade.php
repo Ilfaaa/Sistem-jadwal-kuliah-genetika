@@ -110,8 +110,8 @@
                     <td scope="row">{{ $user->is_active == 1 ? "Aktif" : "Non Aktif" }}</td>
                     <td scope="row">
                       <form action="/manageusers/{{ $user->id_user }}/edit" method="get" class="d-inline">
-                        <button type="submit" class="badge bg-lime">
-                          <i class="fas fa-user-edit"></i>&nbsp;edit
+                        <button type="submit" class="badge badge-editTheme">
+                          <i class="fas fa-user-edit"></i>&nbsp;ubah
                         </button>
                       </form>
 

@@ -28,7 +28,14 @@ table tr td {
 
 /* AdminLTE butuh ini agar content selalu mengisi ruang */
 .content-wrapper {
-  flex: 1;
+  flex: 1 0 auto;
+}
+
+/* Force main-footer to behave as a sticky footer relative to wrapper, pushing to bottom of page */
+.main-footer {
+  position: relative !important;
+  margin-top: auto !important;
+  z-index: 1030;
 }
 
 /* Content area theme */
@@ -42,7 +49,7 @@ table tr td {
    - base:   #EFECE3
    - light:  #8FABD4
    - main:   #4A70A9
-   - dark:   #000000
+   - dark:   #3a5f96
 ========================= */
 
 /* =========================
@@ -159,9 +166,10 @@ ol.breadcrumb li a:hover {
 /* =========================
    SIDEBAR ACTIVE (khusus sidebar)
 ========================= */
-.main-sidebar .nav-sidebar .nav-link.active {
+.nav-sidebar > .nav-item > .nav-link.active {
   background-color: #EFECE3 !important;
-  color: #000000 !important;
+  color: #3a5f96 !important;
+  font-weight: 700;
 }
 
 /* =========================
@@ -218,8 +226,54 @@ i.fa-angle-left,
   transition: .5s !important;
 }
 
-.nav-treeview-container li a:hover {
-  color: #4A70A9 !important;
+/* Styling for main menu items so they don't touch the sidebar edges and have rounded corners */
+.nav-sidebar > .nav-item > .nav-link {
+  margin-left: 12px !important;
+  margin-right: 12px !important;
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
+  border-radius: 8px !important;
+  transition: all 0.3s;
+}
+
+/* Base style for submenus background container (slightly darker, rounded, centered) */
+.nav-sidebar .nav-treeview,
+.nav-sidebar .nav-treeview-container {
+  background-color: rgba(0, 0, 0, 0.15) !important;
+  border-radius: 8px !important;
+  margin-left: 12px !important;
+  margin-right: 12px !important;
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  padding: 6px 0 !important;
+}
+
+/* Ensure sub-menu items stand out, white text by default, nested within the sub-menu container */
+.nav-sidebar .nav-treeview .nav-link,
+.nav-sidebar .nav-treeview-container .nav-link {
+  color: #EFECE3 !important;
+  margin-left: 6px !important;
+  margin-right: 6px !important;
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
+  border-radius: 6px !important;
+  padding-left: 16px !important;
+  transition: all 0.3s;
+}
+
+/* Hover style for sub-menu items */
+.nav-sidebar .nav-treeview .nav-link:hover,
+.nav-sidebar .nav-treeview-container .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #FFFFFF !important;
+}
+
+/* Active style for sub-menu items (slightly darker cream background than main active menu) */
+.nav-sidebar .nav-treeview .nav-link.active,
+.nav-sidebar .nav-treeview-container .nav-link.active {
+  background-color: #D2CFC6 !important;
+  color: #3a5f96 !important;
+  font-weight: 700;
 }
 
 i.fa-angle-left {
@@ -393,4 +447,51 @@ div.dosen-request-container div { transition: .5s; }
   font-size: 12px;
   color: red;
   font-style: italic;
+}
+
+/* Custom edit badge button theme */
+.badge-editTheme {
+  background-color: #2bb673 !important;
+  color: #ffffff !important;
+  transition: background-color 0.4s, color 0.4s;
+}
+
+.badge-editTheme:hover {
+  background-color: #208b57 !important;
+  color: #ffffff !important;
+}
+
+/* Custom dosen badge / tooltip trigger */
+.class-dosen-badge {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+/* For non-badge lecturer codes, give a subtle underline */
+td span.class-dosen-badge:not(.badge) {
+  border-bottom: 1px dotted #4A70A9;
+  font-weight: bold;
+}
+
+/* =========================
+   SIDEBAR DOSEN LIST
+========================= */
+.sidebar-dosen-item {
+  transition: background-color 0.2s;
+}
+.sidebar-dosen-item:hover {
+  background-color: rgba(143, 171, 212, 0.15);
+}
+
+#sidebar-dosen-list::-webkit-scrollbar { width: 5px; }
+#sidebar-dosen-list::-webkit-scrollbar-track { background: transparent; }
+#sidebar-dosen-list::-webkit-scrollbar-thumb { background: #4F5962; border-radius: 10px; }
+#sidebar-dosen-list::-webkit-scrollbar-thumb:hover { background: #8FABD4; }
+
+/* Arrow animation for dosen info toggle */
+i.fa-angle-left.arrow-dosen-info {
+  transition: transform 0.3s ease !important;
+}
+i.fa-angle-left.arrow-dosen-info.rotate-90d {
+  transform: rotate(-90deg);
 }

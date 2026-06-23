@@ -47,6 +47,7 @@ class ManagedosenController extends Controller
         'M.pd.b.' => 'M.Pd.B.',
         'M.th.' => 'M.Th.',
         'S.s.' => 'S.S.',
+        'ipm.' => 'IPM.'
         
 
         
@@ -64,11 +65,14 @@ class ManagedosenController extends Controller
         $request_keyword = "";
 
         if ($request->keyword) {
-            $dosen = Dosen::where('nama', 'LIKE', "%{$request->keyword}%")
-                ->orWhere('program_studi', 'LIKE', "%{$request->keyword}%")
-                ->orWhere('kode_dosen', 'LIKE', "%{$request->keyword}%")
-                ->orWhere('nidn', 'LIKE', "%{$request->keyword}%")
-                ->get();
+            $keyword = $request->keyword;
+            // Kode Aman (Nested Query Builder & Parameter Binding) setelah Refactoring (Pengujian Tahap II)
+            $dosen = Dosen::where(function($q) use ($keyword) {
+                $q->where('nama', 'LIKE', '%' . $keyword . '%')
+                  ->orWhere('program_studi', 'LIKE', '%' . $keyword . '%')
+                  ->orWhere('kode_dosen', 'LIKE', '%' . $keyword . '%')
+                  ->orWhere('nidn', 'LIKE', '%' . $keyword . '%');
+            })->get();
 
             $request_keyword = $request->keyword;
         } else {
@@ -93,7 +97,7 @@ class ManagedosenController extends Controller
             [
                 'kode_dosen' => ['required', 'max:30', 'regex:/^[A-Za-z0-9]+$/', 'unique:dosen,kode_dosen'],
                 'nama' => 'required|min:3|max:255',
-                'nidn' => 'required',
+                'nidn' => ['required', 'unique:dosen,nidn'],
                 'program_studi' => 'required'
             ],
             [
@@ -105,6 +109,7 @@ class ManagedosenController extends Controller
                 'nama.min' => 'Nama minimal 3 huruf.',
                 'nama.max' => 'Nama maksimal 255 huruf.',
                 'nidn.required' => 'NIDN Atau NIP Tidak Boleh Kosong.',
+                'nidn.unique' => 'NIP/NIDN sudah digunakan oleh dosen lain.',
                 'program_studi.required' => 'Harap pilih salah satu program studi.',
             ]
         );
@@ -140,6 +145,7 @@ class ManagedosenController extends Controller
                 'nidn' => $request->nidn,
                 'nama' => $namaDosen,
                 'program_studi' => $programStudi,
+                'no_whatsapp' => $request->no_whatsapp,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -169,7 +175,10 @@ class ManagedosenController extends Controller
                     Rule::unique('dosen', 'kode_dosen')->ignore($kode_dosen, 'kode_dosen')
                 ],
                 'nama' => 'required|min:3|max:255',
-                'nidn' => 'required',
+                'nidn' => [
+                    'required',
+                    Rule::unique('dosen', 'nidn')->ignore($kode_dosen, 'kode_dosen')
+                ],
                 'program_studi' => 'required'
             ],
             [
@@ -181,6 +190,7 @@ class ManagedosenController extends Controller
                 'nama.min' => 'Nama minimal 3 huruf.',
                 'nama.max' => 'Nama maksimal 255 huruf.',
                 'nidn.required' => 'NIDN Atau NIP Tidak Boleh Kosong.',
+                'nidn.unique' => 'NIP/NIDN sudah digunakan oleh dosen lain.',
                 'program_studi.required' => 'Harap pilih salah satu program studi.',
             ]
         );
@@ -219,6 +229,7 @@ class ManagedosenController extends Controller
                     'nama' => $namaDosenBaru,
                     'nidn' => $request->nidn,
                     'program_studi' => $programStudiBaru,
+                    'no_whatsapp' => $request->no_whatsapp,
                     'updated_at' => now(),
                 ]);
 

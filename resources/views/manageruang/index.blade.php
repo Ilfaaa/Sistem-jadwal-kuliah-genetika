@@ -107,7 +107,7 @@
                       </td>
                       <td scope="row">
                         @if(($r->tipe_ruang ?? 'reguler') == 'laboratorium')
-                          <span class="badge bg-orange">Laboratorium</span>
+                          <span class="badge bg-orange text-white" style="color: #fff !important;">Laboratorium</span>
                         @else
                           <span class="badge bg-success">Reguler</span>
                         @endif
@@ -115,8 +115,8 @@
                       <td scope="row">{{ ucwords($r->nama_prodi) }}</td>
                       <td scope="row">
                         <form action="/manageruang/{{ $r->kode_ruang }}/edit" method="get" class="d-inline">
-                          <button type="submit" class="badge bg-lime">
-                            <i class="fas fa-edit"></i>&nbsp;edit
+                          <button type="submit" class="badge badge-editTheme">
+                            <i class="fas fa-edit"></i>&nbsp;ubah
                           </button>
                         </form>
 

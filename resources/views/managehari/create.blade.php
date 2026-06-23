@@ -16,7 +16,7 @@
             <a href="/home/dashboard"><i class="fas fa-igloo mr-2"></i>Home</a>
           </li>
           <li class="breadcrumb-item">
-            <a href="/managewaktu/managehari">Manage Hari</a>
+            <a href="/managehari">Manage Hari</a>
           </li>
           <li class="breadcrumb-item active">Tambah Hari</li>
         </ol>
@@ -37,7 +37,7 @@
             <h3 class="card-title text-whiteTheme">Form Tambah Hari</h3>
           </div>
 
-          <form method="post" action="/managewaktu/managehari">
+          <form method="post" action="/managehari">
             @csrf
 
             <div class="card-body">
@@ -59,7 +59,7 @@
             </div>
 
             <div class="card-footer">
-              <a href="/managewaktu/managehari" class="btn btn-outline-greenTheme">Kembali</a>
+              <a href="/managehari" class="btn btn-outline-greenTheme">Kembali</a>
               <button type="submit" class="btn btn-greenTheme float-right">Tambah Hari</button>
             </div>
 

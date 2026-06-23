@@ -3,32 +3,13 @@
 @section('title','My Profile | Sistem Penjadwalan Kuliah')
 
 @section('content')
-  <!-- Content Header (Page header) -->
-  <div class="content-header">
-    <div class="container-fluid">
-      <div class="row mb-2">
-        <div class="col-sm-6">
-          <h1 class="m-0">My Profile</h1>
-        </div>
-        <div class="col-sm-6">
-          <ol class="breadcrumb float-sm-right">
-            <li class="breadcrumb-item">
-              <a href="/home/dashboard"><i class="fas fa-igloo mr-2"></i>Home</a>
-            </li>
-            <li class="breadcrumb-item active">My Profile</li>
-          </ol>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- /.content-header -->
-
+  
   <!-- Main content -->
-  <section class="content">
+  <section class="content d-flex flex-column justify-content-center" style="min-height: 80vh;">
     <div class="container-fluid">
 
-      <div class="row">
-        <div class="col-12 col-md-6">
+      <div class="row justify-content-center">
+        <div class="col-12 col-md-8">
           @if (session('status'))
             <div class="alert alert-success alert-dismissible fade show" role="alert">
               {{ session('status') }}
@@ -40,24 +21,25 @@
         </div>
       </div>
 
-      <div class="row">
-        <div class="col-12">
-          <div class="card card-teal card-outline">
-            <div class="card-body box-profile">
+      <div class="row justify-content-center">
+        <div class="col-12 col-md-6 col-lg-5">
+          <div class="card shadow-lg" style="border-radius: 15px; border-top: 3px solid #4A70A9;">
+            <div class="card-body bg-white" style="border-radius: 15px;">
 
               <div class="text-center">
                 <img
-                  class="profile-user-img img-fluid img-circle"
+                  class="profile-user-img img-fluid img-circle shadow-sm" style="width: 130px; height: 130px; object-fit: cover; border: 4px solid #fff;"
                   src="{{ asset('/img/profile/'.$user_login->image) }}"
                   alt="User profile picture"
                 >
               </div>
 
-              <h3 class="profile-username text-center text-light">
+              <h3 class="profile-username text-center text-dark">
                 {{ ucwords($user_login->name) }}
               </h3>
+              <p class="text-center text-muted mb-3" style="font-size: 14px;">{{ $user_login->email }}</p>
 
-              <p class="text-center text-light mb-1">
+              <p class="text-center text-dark mb-1">
                 @if($user_login->role_id == 1)
                   Admin
                 @elseif($user_login->role_id == 2)
@@ -69,7 +51,7 @@
                 @endif
               </p>
 
-              <p class="text-center text-light mt-n1">
+              <p class="text-center text-dark mt-n1">
                 @if(empty($user_login->created_at))
                   Member Since A Long Time Ago.
                 @else

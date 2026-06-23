@@ -6,7 +6,7 @@
 @php
     $jamList = [];
 
-    $start = strtotime('08:00');
+    $start = strtotime('07:00');
     $end = strtotime('17:00');
 
     while ($start < $end) {
@@ -69,8 +69,6 @@
 
     .blocking-board-wrapper {
         overflow-x: auto;
-        overflow-y: auto;
-        max-height: 520px;
     }
 
     .blocking-board {

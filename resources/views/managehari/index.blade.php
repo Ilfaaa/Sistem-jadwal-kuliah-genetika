@@ -42,7 +42,7 @@
       </div>
     </div>
 
-    <a href="/managewaktu/managehari/create" class="btn btn-outline-greenTheme mb-2">
+    <a href="/managehari/create" class="btn btn-outline-greenTheme mb-2">
       <i class="fas fa-plus-circle mr-1"></i>Tambah Data Hari
     </a>
 
@@ -52,7 +52,7 @@
           <div class="card-header bg-greenTheme">
             <h3 class="card-title text-whiteTheme">Tabel Hari</h3>
 
-            <form method="post" action="/managewaktu/managehari/keyword">
+            <form method="post" action="/managehari/keyword">
               @csrf
               <div class="card-tools">
                 <div class="input-group input-group-sm float-right" style="width: 250px;">
@@ -93,7 +93,7 @@
                     <td scope="row">{{ $r->kode_hari }}</td>
                     <td scope="row">{{ ucwords($r->nama_hari) }}</td>
                     <td scope="row">
-                      <form action="/managewaktu/managehari/{{ $r->kode_hari }}" method="post" class="d-inline">
+                      <form action="/managehari/{{ $r->kode_hari }}" method="post" class="d-inline">
                         @method('delete')
                         @csrf
                         <button type="submit" class="badge bg-maroon">
