@@ -59,8 +59,8 @@
                 @if(session('user_login') && isset($user_login) && $user_login->role_id == 1)
                     <li class="nav-header">MENU PENGELOLAAN</li>
 
-                    <li class="nav-item">
-                        <a href="/managekuliah" class="nav-link {{ (request()->segment(1) == 'managekuliah' && request()->segment(2) == '') ? 'active' : '' }}">
+                    <li class="nav-item {{ (request()->segment(1) == 'managekuliah') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ (request()->segment(1) == 'managekuliah') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-school"></i>
                             <p>Kelola Perkuliahan</p>
                             <i class="right fas fa-angle-left arrow-kuliah"></i>
