@@ -2,7 +2,7 @@
 <aside class="main-sidebar sidebar-dark-primary elevation-4" style="background: linear-gradient(180deg, #3a5f96 0%, #4A70A9 100%);">
     <!-- Brand Logo -->
     <a href="{{ session('user_login') ? '/home/dashboard' : '/' }}" class="brand-link" style="margin-left: 15px;">
-        <img src="{{ asset('/img/logo-sijatom.png') }}" alt="Sijatom Logo" class="brand-image img-circle ml-n1">
+        <img src="{{ asset('/img/logo-sijatom.png') }}" alt="Sijatom Logo" class="brand-image ml-n1">
         <span class="brand-text font-weight-bold" style="font-size: 16px">SIJATOM</span>
     </a>
 
