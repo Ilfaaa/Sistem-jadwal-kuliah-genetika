@@ -41,29 +41,28 @@ table tr td {
 /* Content area theme */
 .content-theme {
   background: 
-    /* Dot grid pattern */
-    radial-gradient(rgba(74, 112, 169, 0.08) 1.5px, transparent 1.5px) 0 0 / 24px 24px,
-    /* Soft colorful glow spheres */
-    radial-gradient(circle at 15% 20%, rgba(74, 112, 169, 0.12) 0%, transparent 45%),
-    radial-gradient(circle at 85% 75%, rgba(58, 95, 150, 0.14) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(143, 171, 212, 0.06) 0%, transparent 35%),
-    /* Base sand gradient */
-    linear-gradient(135deg, #F4F1EC 0%, #E8E4DE 100%) !important;
-  color: #2b2d42 !important;
+    /* Dot grid pattern (white/light) */
+    radial-gradient(rgba(255, 255, 255, 0.05) 1.5px, transparent 1.5px) 0 0 / 24px 24px,
+    /* Soft colorful glow spheres (lighter blue glow on dark blue) */
+    radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+    /* Base blue gradient matching login page */
+    linear-gradient(135deg, #3a5f96 0%, #4A70A9 50%, #8FABD4 100%) !important;
+  color: #000000 !important;
   position: relative;
   overflow: hidden;
   min-height: 100vh;
 }
 
-/* Background decorative circles (soft outline, floating rings) */
+/* Background decorative circles (soft outline, floating rings - white) */
 .content-theme::before {
   content: "";
   position: absolute;
   width: 380px;
   height: 380px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(74, 112, 169, 0.04), rgba(143, 171, 212, 0.01));
-  border: 1.5px solid rgba(74, 112, 169, 0.12);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
   top: -80px;
   right: -80px;
   pointer-events: none;
@@ -77,8 +76,8 @@ table tr td {
   width: 260px;
   height: 260px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(58, 95, 150, 0.04), rgba(143, 171, 212, 0.01));
-  border: 1.5px solid rgba(58, 95, 150, 0.1);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
   bottom: 60px;
   left: -80px;
   pointer-events: none;
@@ -102,39 +101,40 @@ table tr td {
   z-index: 1;
 }
 
-/* Page headers for light background contrast */
+/* Page headers for dark gradient contrast */
 .content-theme .content-header h1,
 .content-theme .content-header h2,
 .content-theme .content-header h3,
 .content-theme .content-header .m-0 {
-  color: #3a5f96 !important;
-  text-shadow: none;
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   font-weight: 700 !important;
 }
 
-/* Breadcrumb style for content header (light themed) */
+/* Breadcrumb style for content header */
 .content-theme .breadcrumb {
-  background: rgba(255, 255, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   padding: 6px 14px !important;
   border-radius: 50px !important;
-  border: 1px solid rgba(74, 112, 169, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .content-theme .breadcrumb-item,
 .content-theme .breadcrumb-item.active {
-  color: #555555 !important;
+  color: rgba(255, 255, 255, 0.9) !important;
 }
 
 .content-theme .breadcrumb-item a {
-  color: #3a5f96 !important;
+  color: #ffffff !important;
   font-weight: 500;
-  transition: color 0.2s;
+  transition: opacity 0.2s;
 }
 
 .content-theme .breadcrumb-item a:hover {
-  color: #8FABD4 !important;
+  opacity: 0.8;
+  color: #ffffff !important;
 }
 
 /* =========================
