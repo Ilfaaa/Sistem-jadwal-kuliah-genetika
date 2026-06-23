@@ -5,16 +5,37 @@
 @include('layouts.partials.navbar')
 
 <div class="content-wrapper content-theme">
-    <!-- Floating Background Ornaments -->
+    <!-- Floating PlayStation-style Background Ornaments -->
     <div class="bg-ornaments-wrapper">
-        <div class="bg-ornament shape-triangle shape-1"></div>
-        <div class="bg-ornament shape-square shape-2"></div>
-        <div class="bg-ornament shape-pentagon shape-3"></div>
-        <div class="bg-ornament shape-circle shape-4"></div>
-        <div class="bg-ornament shape-triangle shape-5"></div>
-        <div class="bg-ornament shape-square shape-6"></div>
-        <div class="bg-ornament shape-cross shape-7"></div>
-        <div class="bg-ornament shape-pentagon shape-8"></div>
+        <!-- Row 1 -->
+        <div class="bg-ornament ps-triangle pos-1"></div>
+        <div class="bg-ornament ps-square pos-2"></div>
+        <div class="bg-ornament ps-circle pos-3"></div>
+        <div class="bg-ornament ps-cross pos-4"></div>
+        
+        <!-- Row 2 -->
+        <div class="bg-ornament ps-triangle pos-5"></div>
+        <div class="bg-ornament ps-square pos-6"></div>
+        <div class="bg-ornament ps-circle pos-7"></div>
+        <div class="bg-ornament ps-cross pos-8"></div>
+        
+        <!-- Row 3 -->
+        <div class="bg-ornament ps-triangle pos-9"></div>
+        <div class="bg-ornament ps-square pos-10"></div>
+        <div class="bg-ornament ps-circle pos-11"></div>
+        <div class="bg-ornament ps-cross pos-12"></div>
+        
+        <!-- Row 4 -->
+        <div class="bg-ornament ps-triangle pos-13"></div>
+        <div class="bg-ornament ps-square pos-14"></div>
+        <div class="bg-ornament ps-circle pos-15"></div>
+        <div class="bg-ornament ps-cross pos-16"></div>
+        
+        <!-- Row 5 -->
+        <div class="bg-ornament ps-triangle pos-17"></div>
+        <div class="bg-ornament ps-square pos-18"></div>
+        <div class="bg-ornament ps-circle pos-19"></div>
+        <div class="bg-ornament ps-cross pos-20"></div>
     </div>
     @yield('content')
 </div>
