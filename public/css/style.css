@@ -596,63 +596,34 @@ i.fa-angle-left.arrow-dosen-info.rotate-90d {
 
 /* === Triangle (outline only) === */
 .bg-ornament.ps-triangle {
-  width: 44px;
-  height: 38px;
-  background: transparent;
-  border: none;
-}
-.bg-ornament.ps-triangle::after {
-  content: "";
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  border-left: 2.5px solid rgba(255,255,255,0.9);
-  border-right: 2.5px solid rgba(255,255,255,0.9);
-  border-bottom: 2.5px solid rgba(255,255,255,0.9);
-  border-top: none;
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  box-sizing: border-box;
+  width: 42px;
+  height: 42px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.9)' stroke-width='2.2' stroke-linejoin='round'><polygon points='12,3.5 21.5,20 2.5,20'/></svg>") no-repeat center center;
+  background-size: contain;
 }
 
 /* === Square (outline only) === */
 .bg-ornament.ps-square {
   width: 38px;
   height: 38px;
-  background: transparent;
-  border: 2.5px solid rgba(255,255,255,0.9);
-  border-radius: 5px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.9)' stroke-width='2.2' stroke-linejoin='round'><rect x='3.5' y='3.5' width='17' height='17' rx='2.5'/></svg>") no-repeat center center;
+  background-size: contain;
 }
 
 /* === Circle (outline only) === */
 .bg-ornament.ps-circle {
-  width: 42px;
-  height: 42px;
-  background: transparent;
-  border: 2.5px solid rgba(255,255,255,0.9);
-  border-radius: 50%;
-}
-
-/* === X Cross (two rotated bars) === */
-.bg-ornament.ps-cross {
   width: 40px;
   height: 40px;
-  background: transparent;
-  border: none;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.9)' stroke-width='2.2'><circle cx='12' cy='12' r='8.5'/></svg>") no-repeat center center;
+  background-size: contain;
 }
-.bg-ornament.ps-cross::before,
-.bg-ornament.ps-cross::after {
-  content: "";
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 85%; height: 2.5px;
-  background: rgba(255,255,255,0.9);
-  border-radius: 2px;
-}
-.bg-ornament.ps-cross::before {
-  transform: translate(-50%,-50%) rotate(45deg);
-}
-.bg-ornament.ps-cross::after {
-  transform: translate(-50%,-50%) rotate(-45deg);
+
+/* === X Cross (outline only) === */
+.bg-ornament.ps-cross {
+  width: 36px;
+  height: 36px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.9)' stroke-width='2.5' stroke-linecap='round'><line x1='5' y1='5' x2='19' y2='19'/><line x1='19' y1='5' x2='5' y2='19'/></svg>") no-repeat center center;
+  background-size: contain;
 }
 
 /* Container for randomized absolute placements */

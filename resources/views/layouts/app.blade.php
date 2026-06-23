@@ -15,8 +15,8 @@
         
         wrapper.innerHTML = '';
         
-        // Shapes: Triangle, Square, Circle. Triangle is weighted higher (50% probability) to replace the lines/crosses.
-        const shapes = ['ps-triangle', 'ps-triangle', 'ps-square', 'ps-circle'];
+        // Shapes: Triangle, Square, Circle, and Cross (X). Triangle is weighted to be most common.
+        const shapes = ['ps-triangle', 'ps-triangle', 'ps-square', 'ps-circle', 'ps-cross'];
         const animations = ['psFloat1', 'psFloat2', 'psFloat3', 'psFloat4'];
         
         const placed = [];
