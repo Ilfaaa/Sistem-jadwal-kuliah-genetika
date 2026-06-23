@@ -611,3 +611,159 @@ i.fa-angle-left.arrow-dosen-info {
 i.fa-angle-left.arrow-dosen-info.rotate-90d {
   transform: rotate(-90deg);
 }
+
+/* ==========================================
+   FLOATING GEOMETRIC ORNAMENTS BACKGROUND
+   ========================================== */
+.bg-ornaments-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.bg-ornament {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+/* Shape Geometry using Clip Paths or Borders */
+.bg-ornament.shape-square {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.bg-ornament.shape-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.bg-ornament.shape-triangle {
+  width: 40px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.03);
+  border: none;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+.bg-ornament.shape-triangle::before {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  background: transparent;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.bg-ornament.shape-pentagon {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.03);
+  border: none;
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+}
+.bg-ornament.shape-pentagon::before {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  background: transparent;
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.bg-ornament.shape-cross {
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.03);
+  border: none;
+  clip-path: polygon(10% 38%, 38% 38%, 38% 10%, 62% 10%, 62% 38%, 90% 38%, 90% 62%, 62% 62%, 62% 90%, 38% 90%, 38% 62%, 10% 62%);
+}
+.bg-ornament.shape-cross::before {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  background: transparent;
+  clip-path: polygon(10% 38%, 38% 38%, 38% 10%, 62% 10%, 62% 38%, 90% 38%, 90% 62%, 62% 62%, 62% 90%, 38% 90%, 38% 62%, 10% 62%);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Distribution / Positioning & Individual Float Animations */
+.bg-ornament.shape-1 {
+  top: 15%;
+  left: 8%;
+  transform: rotate(15deg);
+  animation: floatOrn1 16s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-2 {
+  top: 22%;
+  right: 12%;
+  transform: rotate(45deg);
+  animation: floatOrn2 20s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-3 {
+  top: 45%;
+  left: 14%;
+  transform: rotate(-25deg);
+  animation: floatOrn3 24s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-4 {
+  top: 58%;
+  right: 8%;
+  animation: floatOrn4 18s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-5 {
+  bottom: 25%;
+  left: 6%;
+  transform: rotate(70deg);
+  animation: floatOrn1 22s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-6 {
+  bottom: 15%;
+  right: 15%;
+  transform: rotate(110deg);
+  animation: floatOrn2 15s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-7 {
+  top: 78%;
+  left: 18%;
+  transform: rotate(35deg);
+  animation: floatOrn3 19s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-8 {
+  top: 8%;
+  right: 28%;
+  transform: rotate(120deg);
+  animation: floatOrn4 25s ease-in-out infinite alternate;
+}
+
+/* Float Animations Keyframes */
+@keyframes floatOrn1 {
+  0% { transform: translateY(0) rotate(15deg); }
+  100% { transform: translateY(-25px) translateX(15px) rotate(45deg); }
+}
+
+@keyframes floatOrn2 {
+  0% { transform: translateY(0) rotate(45deg); }
+  100% { transform: translateY(30px) translateX(-20px) rotate(-15deg); }
+}
+
+@keyframes floatOrn3 {
+  0% { transform: translateY(0) rotate(-25deg); }
+  100% { transform: translateY(-35px) translateX(-10px) rotate(15deg); }
+}
+
+@keyframes floatOrn4 {
+  0% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(25px) translateX(25px) rotate(180deg); }
+}
+
+
+
