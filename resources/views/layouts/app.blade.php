@@ -15,46 +15,21 @@
         
         wrapper.innerHTML = '';
         
-        // Shapes: Triangle, Square, Circle, and Cross (X). Triangle is weighted to be most common.
-        const shapes = ['ps-triangle', 'ps-triangle', 'ps-square', 'ps-circle', 'ps-cross'];
+        // Shapes: Triangle, Square, Circle. Triangle is weighted to be the most common. No cross (X) lines.
+        const shapes = ['ps-triangle', 'ps-triangle', 'ps-triangle', 'ps-square', 'ps-circle'];
         const animations = ['psFloat1', 'psFloat2', 'psFloat3', 'psFloat4'];
         
-        const placed = [];
-        const count = 28; // Optimized count of beautiful random ornaments
-        const minDistance = 10; // 10% distance threshold prevents any overlaps
+        const count = 35; // Increased count for more ornaments
         
         for (let i = 0; i < count; i++) {
-            let top, left;
-            let attempts = 0;
-            let valid = false;
-            
-            // Try to find a non-overlapping spot
-            while (!valid && attempts < 300) {
-                top = Math.random() * 88 + 5; // 5% to 93%
-                left = Math.random() * 88 + 5; // 5% to 93%
-                attempts++;
-                
-                valid = true;
-                for (const pos of placed) {
-                    const dx = pos.left - left;
-                    const dy = pos.top - top;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < minDistance) {
-                        valid = false;
-                        break;
-                    }
-                }
-            }
-            
-            if (!valid) continue; // Skip if no valid spot found
-            
-            placed.push({ top, left });
+            const top = Math.random() * 90 + 5; // 5% to 95%
+            const left = Math.random() * 90 + 5; // 5% to 95%
             
             const container = document.createElement('div');
             container.className = 'bg-ornament-container';
             
             const rotate = Math.random() * 360;
-            const scale = 0.75 + Math.random() * 0.45; // size variation: 0.75x to 1.2x
+            const scale = 0.6 + Math.random() * 0.5; // size variation: 0.6x to 1.1x (none are too large)
             
             container.style.top = `${top}%`;
             container.style.left = `${left}%`;
@@ -62,7 +37,7 @@
             
             const shape = shapes[Math.floor(Math.random() * shapes.length)];
             const animation = animations[Math.floor(Math.random() * animations.length)];
-            const duration = 14 + Math.random() * 14; // 14s to 28s speed
+            const duration = 12 + Math.random() * 16; // 12s to 28s speed
             const delay = -Math.random() * 20; // out-of-sync starting phase
             
             const ornament = document.createElement('div');
