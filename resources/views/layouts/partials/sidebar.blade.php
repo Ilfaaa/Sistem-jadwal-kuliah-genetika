@@ -49,7 +49,7 @@
                     <li class="nav-header">MENU ADMIN</li>
 
                     <li class="nav-item">
-                        <a href="/manageusers" class="nav-link {{ (request()->segment(1) == 'manageusers') ? 'active' : '' }}">
+                        <a href="/manageusers" class="nav-link {{ (request()->segment(1) == 'manageusers' && request()->segment(2) != 'approvals') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-user-friends"></i>
                             <p>Kelola Pengguna</p>
                         </a>

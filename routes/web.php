@@ -32,10 +32,15 @@ Route::group(['middleware' => 'CheckLogoutMiddleware'], function () {
         Route::get('/manageusers/create', 'ManageusersController@create');
         Route::post('/manageusers/keyword', 'ManageusersController@index');
         Route::post('/manageusers', 'ManageusersController@store');
+        
+        // Approvals Routes
+        Route::get('/manageusers/approvals', 'ManageusersController@approvals')->name('manageusers.approvals');
+        Route::post('/manageusers/approvals/{id}/approve', 'ManageusersController@approve')->name('manageusers.approve');
+        Route::post('/manageusers/approvals/{id}/reject', 'ManageusersController@reject')->name('manageusers.reject');
+
         Route::delete('/manageusers/{id}', 'ManageusersController@destroy');
         Route::get('/manageusers/{id}/edit', 'ManageusersController@edit');
         Route::patch('/manageusers/{id}', 'ManageusersController@update');
-
 
     });
 

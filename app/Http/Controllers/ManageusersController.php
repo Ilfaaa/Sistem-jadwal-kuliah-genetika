@@ -127,4 +127,26 @@ class ManageusersController extends Controller
         DB::table('users')->where('id_user', $id)->delete();
         return redirect('/manageusers')->with('status', 'Data user berhasil dihapus');
     }
+
+    public function approvals(Request $request)
+    {
+        $user_login = $request->session()->get('user_login');
+        $countRequest = DB::table('request_kuliah')->count() + DB::table('request_ruang')->count() + DB::table('request_waktu')->count();
+        
+        $pendingUsers = DB::table('users')->where('is_active', 2)->get();
+        
+        return view('manageusers.approvals', compact('pendingUsers', 'user_login', 'countRequest'));
+    }
+
+    public function approve($id)
+    {
+        DB::table('users')->where('id_user', $id)->update(['is_active' => 1]);
+        return redirect('/manageusers/approvals')->with('status', 'Akun berhasil disetujui dan diaktifkan.');
+    }
+
+    public function reject($id)
+    {
+        DB::table('users')->where('id_user', $id)->delete();
+        return redirect('/manageusers/approvals')->with('status', 'Akun berhasil ditolak dan dihapus.');
+    }
 }
