@@ -87,7 +87,8 @@ class AuthController extends Controller
     }
 
     public function logout(Request $request){
-        $request->session()->flush();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
         return redirect('/login');
     }
 }
