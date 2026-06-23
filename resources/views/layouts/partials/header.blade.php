@@ -67,7 +67,6 @@
       class="animation__shake"
       src="{{ asset('/img/logo-sijatom.png') }}"
       alt="SijatomLogo"
-      height="60"
-      width="60"
+      style="max-height: 80px; width: auto;"
     >
   </div>
