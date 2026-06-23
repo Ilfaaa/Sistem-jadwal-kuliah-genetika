@@ -634,22 +634,22 @@ i.fa-angle-left.arrow-dosen-info.rotate-90d {
   box-sizing: border-box;
 }
 
-/* Shape Geometry using Clip Paths or Borders */
+/* Shape Geometry using Clip Paths or Borders (Large scale) */
 .bg-ornament.shape-square {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 90px;
+  height: 90px;
+  border-radius: 16px;
 }
 
 .bg-ornament.shape-circle {
-  width: 40px;
-  height: 40px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
 }
 
 .bg-ornament.shape-triangle {
-  width: 40px;
-  height: 36px;
+  width: 100px;
+  height: 86px;
   background: rgba(255, 255, 255, 0.03);
   border: none;
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
@@ -657,15 +657,15 @@ i.fa-angle-left.arrow-dosen-info.rotate-90d {
 .bg-ornament.shape-triangle::before {
   content: "";
   position: absolute;
-  inset: 1.5px;
+  inset: 2px;
   background: transparent;
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.08);
 }
 
 .bg-ornament.shape-pentagon {
-  width: 40px;
-  height: 40px;
+  width: 96px;
+  height: 96px;
   background: rgba(255, 255, 255, 0.03);
   border: none;
   clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
@@ -673,15 +673,15 @@ i.fa-angle-left.arrow-dosen-info.rotate-90d {
 .bg-ornament.shape-pentagon::before {
   content: "";
   position: absolute;
-  inset: 1.5px;
+  inset: 2px;
   background: transparent;
   clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
-  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.08);
 }
 
 .bg-ornament.shape-cross {
-  width: 32px;
-  height: 32px;
+  width: 80px;
+  height: 80px;
   background: rgba(255, 255, 255, 0.03);
   border: none;
   clip-path: polygon(10% 38%, 38% 38%, 38% 10%, 62% 10%, 62% 38%, 90% 38%, 90% 62%, 62% 62%, 62% 90%, 38% 90%, 38% 62%, 10% 62%);
@@ -689,59 +689,62 @@ i.fa-angle-left.arrow-dosen-info.rotate-90d {
 .bg-ornament.shape-cross::before {
   content: "";
   position: absolute;
-  inset: 1.5px;
+  inset: 2px;
   background: transparent;
   clip-path: polygon(10% 38%, 38% 38%, 38% 10%, 62% 10%, 62% 38%, 90% 38%, 90% 62%, 62% 62%, 62% 90%, 38% 90%, 38% 62%, 10% 62%);
-  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Distribution / Positioning & Individual Float Animations */
+/* Distribution / Positioning (Non-overlapping & Margin aligned) */
+/* Left Column Shapes */
 .bg-ornament.shape-1 {
-  top: 15%;
-  left: 8%;
+  top: 8%;
+  left: 5%;
   transform: rotate(15deg);
   animation: floatOrn1 16s ease-in-out infinite alternate;
 }
-.bg-ornament.shape-2 {
-  top: 22%;
-  right: 12%;
-  transform: rotate(45deg);
-  animation: floatOrn2 20s ease-in-out infinite alternate;
-}
 .bg-ornament.shape-3 {
-  top: 45%;
-  left: 14%;
+  top: 36%;
+  left: 4%;
   transform: rotate(-25deg);
   animation: floatOrn3 24s ease-in-out infinite alternate;
 }
-.bg-ornament.shape-4 {
-  top: 58%;
-  right: 8%;
-  animation: floatOrn4 18s ease-in-out infinite alternate;
-}
 .bg-ornament.shape-5 {
-  bottom: 25%;
+  top: 65%;
   left: 6%;
   transform: rotate(70deg);
   animation: floatOrn1 22s ease-in-out infinite alternate;
 }
-.bg-ornament.shape-6 {
-  bottom: 15%;
-  right: 15%;
-  transform: rotate(110deg);
-  animation: floatOrn2 15s ease-in-out infinite alternate;
-}
 .bg-ornament.shape-7 {
-  top: 78%;
-  left: 18%;
+  top: 88%;
+  left: 5%;
   transform: rotate(35deg);
   animation: floatOrn3 19s ease-in-out infinite alternate;
 }
+
+/* Right Column Shapes */
 .bg-ornament.shape-8 {
-  top: 8%;
-  right: 28%;
+  top: 12%;
+  right: 6%;
   transform: rotate(120deg);
   animation: floatOrn4 25s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-2 {
+  top: 28%;
+  right: 8%;
+  transform: rotate(45deg);
+  animation: floatOrn2 20s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-4 {
+  top: 54%;
+  right: 5%;
+  animation: floatOrn4 18s ease-in-out infinite alternate;
+}
+.bg-ornament.shape-6 {
+  top: 78%;
+  right: 9%;
+  transform: rotate(110deg);
+  animation: floatOrn2 15s ease-in-out infinite alternate;
 }
 
 /* Float Animations Keyframes */
