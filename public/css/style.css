@@ -40,8 +40,79 @@ table tr td {
 
 /* Content area theme */
 .content-theme {
-  background-color: #EFECE3 !important;
-  color: #000000 !important;
+  background: linear-gradient(135deg, #F4F1EC 0%, #E8E4DE 100%) !important;
+  color: #2b2d42 !important;
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+/* Background decorative circles (soft white highlights on light sand) */
+.content-theme::before {
+  content: "";
+  position: absolute;
+  width: 450px;
+  height: 450px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  top: -150px;
+  right: -100px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.content-theme::after {
+  content: "";
+  position: absolute;
+  width: 350px;
+  height: 350px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  bottom: -50px;
+  left: -80px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.content-theme .content-header,
+.content-theme .content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Page headers for light background contrast */
+.content-theme .content-header h1,
+.content-theme .content-header h2,
+.content-theme .content-header h3,
+.content-theme .content-header .m-0 {
+  color: #3a5f96 !important;
+  text-shadow: none;
+  font-weight: 700 !important;
+}
+
+/* Breadcrumb style for content header (light themed) */
+.content-theme .breadcrumb {
+  background: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  padding: 6px 14px !important;
+  border-radius: 50px !important;
+  border: 1px solid rgba(74, 112, 169, 0.12);
+}
+
+.content-theme .breadcrumb-item,
+.content-theme .breadcrumb-item.active {
+  color: #555555 !important;
+}
+
+.content-theme .breadcrumb-item a {
+  color: #3a5f96 !important;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.content-theme .breadcrumb-item a:hover {
+  color: #8FABD4 !important;
 }
 
 /* =========================
@@ -56,16 +127,39 @@ table tr td {
    CARD / PANEL DEFAULT (AdminLTE)
 ========================= */
 .card {
-  border: 1px solid rgba(74, 112, 169, 0.18);
+  background-color: #ffffff !important;
+  border: 1px solid rgba(74, 112, 169, 0.12) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05) !important;
+  overflow: hidden;
+  margin-bottom: 24px;
 }
 
 .card-header {
-  background-color: rgba(143, 171, 212, 0.18);
-  border-bottom: 1px solid rgba(74, 112, 169, 0.18);
+  background-color: rgba(143, 171, 212, 0.12) !important;
+  border-bottom: 1px solid rgba(74, 112, 169, 0.12) !important;
+  padding: 16px 20px !important;
+}
+
+.card-header.bg-greenTheme {
+  background-color: #4A70A9 !important;
 }
 
 .card-title {
   color: #000000;
+  font-weight: 600 !important;
+}
+
+.card-body {
+  padding: 20px !important;
+}
+
+.card-footer {
+  background-color: rgba(143, 171, 212, 0.05) !important;
+  border-top: 1px solid rgba(74, 112, 169, 0.12) !important;
+  padding: 16px 20px !important;
+  border-bottom-left-radius: 16px !important;
+  border-bottom-right-radius: 16px !important;
 }
 
 /* =========================
