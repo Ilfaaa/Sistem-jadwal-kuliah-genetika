@@ -6,37 +6,49 @@
 
 <div class="content-wrapper content-theme">
     <!-- Floating PlayStation-style Background Ornaments -->
-    <div class="bg-ornaments-wrapper">
-        <!-- Row 1 -->
-        <div class="bg-ornament ps-triangle pos-1"></div>
-        <div class="bg-ornament ps-square pos-2"></div>
-        <div class="bg-ornament ps-circle pos-3"></div>
-        <div class="bg-ornament ps-cross pos-4"></div>
+    <div class="bg-ornaments-wrapper"></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const wrapper = document.querySelector('.bg-ornaments-wrapper');
+        if (!wrapper) return;
         
-        <!-- Row 2 -->
-        <div class="bg-ornament ps-triangle pos-5"></div>
-        <div class="bg-ornament ps-square pos-6"></div>
-        <div class="bg-ornament ps-circle pos-7"></div>
-        <div class="bg-ornament ps-cross pos-8"></div>
+        wrapper.innerHTML = '';
         
-        <!-- Row 3 -->
-        <div class="bg-ornament ps-triangle pos-9"></div>
-        <div class="bg-ornament ps-square pos-10"></div>
-        <div class="bg-ornament ps-circle pos-11"></div>
-        <div class="bg-ornament ps-cross pos-12"></div>
+        // Shapes: Triangle, Square, Circle. Triangle is weighted higher (50% probability) to replace the lines/crosses.
+        const shapes = ['ps-triangle', 'ps-triangle', 'ps-square', 'ps-circle'];
+        const animations = ['psFloat1', 'psFloat2', 'psFloat3', 'psFloat4'];
+        const count = 32; // Plenty of beautiful random ornaments
         
-        <!-- Row 4 -->
-        <div class="bg-ornament ps-triangle pos-13"></div>
-        <div class="bg-ornament ps-square pos-14"></div>
-        <div class="bg-ornament ps-circle pos-15"></div>
-        <div class="bg-ornament ps-cross pos-16"></div>
-        
-        <!-- Row 5 -->
-        <div class="bg-ornament ps-triangle pos-17"></div>
-        <div class="bg-ornament ps-square pos-18"></div>
-        <div class="bg-ornament ps-circle pos-19"></div>
-        <div class="bg-ornament ps-cross pos-20"></div>
-    </div>
+        for (let i = 0; i < count; i++) {
+            const container = document.createElement('div');
+            container.className = 'bg-ornament-container';
+            
+            // Generate truly random positions (using left/top percentages)
+            const top = Math.random() * 92 + 3; // 3% to 95%
+            const left = Math.random() * 92 + 3; // 3% to 95%
+            const rotate = Math.random() * 360;
+            const scale = 0.75 + Math.random() * 0.45; // size variation: 0.75x to 1.2x
+            
+            container.style.top = `${top}%`;
+            container.style.left = `${left}%`;
+            container.style.transform = `rotate(${rotate}deg) scale(${scale})`;
+            
+            const shape = shapes[Math.floor(Math.random() * shapes.length)];
+            const animation = animations[Math.floor(Math.random() * animations.length)];
+            const duration = 14 + Math.random() * 14; // 14s to 28s speed
+            const delay = -Math.random() * 20; // out-of-sync starting phase
+            
+            const ornament = document.createElement('div');
+            ornament.className = `bg-ornament ${shape}`;
+            ornament.style.animation = `${animation} ${duration}s ease-in-out infinite alternate`;
+            ornament.style.animationDelay = `${delay}s`;
+            
+            container.appendChild(ornament);
+            wrapper.appendChild(container);
+        }
+    });
+    </script>
     @yield('content')
 </div>
 
