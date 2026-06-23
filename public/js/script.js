@@ -380,11 +380,6 @@ $(document).ready(function () {
   $(".nav-treeview-container").hide();
   $(".optional-input").hide();
 
-  if (thePath[1] == 'managekuliah') {
-    $('.nav-treeview-container.treeview-kuliah').show();
-    $(".arrow-kuliah").addClass('rotate-n90d');
-  }
-
   if (thePath[1] == 'managewaktu') {
     $('.nav-treeview-container.treeview-waktu').show();
     $(".arrow-waktu").addClass('rotate-n90d');
@@ -400,18 +395,6 @@ $(document).ready(function () {
     }
 
     $(".optional-input").toggle(500);
-  });
-  $(".menu-kuliah-toggle").click(function (e) {
-    e.preventDefault();
-    var arrow = $(this).find("i.fa-angle-left.arrow-kuliah");
-
-    if (arrow.hasClass('rotate-n90d')) {
-      arrow.removeClass('rotate-n90d');
-    } else {
-      arrow.addClass('rotate-n90d');
-    }
-
-    $(".nav-treeview-container.treeview-kuliah").toggle(500);
   });
 
   $(".menu-waktu-toggle").click(function (e) {

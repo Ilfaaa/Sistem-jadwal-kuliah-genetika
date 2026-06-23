@@ -60,37 +60,39 @@
                     <li class="nav-header">MENU PENGELOLAAN</li>
 
                     <li class="nav-item {{ (request()->segment(1) == 'managekuliah') ? 'menu-open' : '' }}">
-                        <a href="#" class="nav-link menu-kuliah-toggle {{ (request()->segment(1) == 'managekuliah') ? 'active' : '' }}">
+                        <a href="#" class="nav-link {{ (request()->segment(1) == 'managekuliah') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-school"></i>
-                            <p>Kelola Perkuliahan</p>
-                            <i class="right fas fa-angle-left arrow-kuliah"></i>
+                            <p>
+                                Kelola Perkuliahan
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
                         </a>
 
-                        <ul class="nav nav-treeview-container treeview-kuliah">
-                            <li class="nav-item ml-2">
-                                <a href="/managekuliah/manageprodi" class="nav-link {{ (request()->segment(2) == 'manageprodi') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-circle-notch"></i>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="/managekuliah/manageprodi" class="nav-link pl-4 {{ (request()->segment(2) == 'manageprodi') ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
                                     <p>Kelola Program Studi</p>
                                 </a>
                             </li>
 
-                            <li class="nav-item ml-2">
-                                <a href="/managekuliah/managematkul" class="nav-link {{ (request()->segment(2) == 'managematkul') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-circle-notch"></i>
+                            <li class="nav-item">
+                                <a href="/managekuliah/managematkul" class="nav-link pl-4 {{ (request()->segment(2) == 'managematkul') ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
                                     <p>Kelola Mata Kuliah</p>
                                 </a>
                             </li>
 
-                            <li class="nav-item ml-2">
-                                <a href="/managekuliah/managedosen" class="nav-link {{ (request()->segment(2) == 'managedosen') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-circle-notch"></i>
+                            <li class="nav-item">
+                                <a href="/managekuliah/managedosen" class="nav-link pl-4 {{ (request()->segment(2) == 'managedosen') ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
                                     <p>Kelola Dosen</p>
                                 </a>
                             </li>
 
-                            <li class="nav-item ml-2">
-                                <a href="/managekuliah/managekelas" class="nav-link {{ (request()->segment(2) == 'managekelas') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-circle-notch"></i>
+                            <li class="nav-item">
+                                <a href="/managekuliah/managekelas" class="nav-link pl-4 {{ (request()->segment(2) == 'managekelas') ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
                                     <p>Kelola Kelas</p>
                                 </a>
                             </li>
