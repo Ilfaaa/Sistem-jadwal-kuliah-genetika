@@ -102,3 +102,26 @@
   color: #3a5f96 !important;
   font-weight: 700 !important;
 }
+
+/* 7. Brand Logo & Title Vertical Alignment (Flexbox Center) */
+.brand-link {
+  display: flex !important;
+  align-items: center !important;
+  padding: 0.8125rem 1rem !important;
+}
+
+.brand-link .brand-image {
+  float: none !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 10px !important;
+  max-height: 33px !important;
+  width: auto !important;
+  display: inline-block !important;
+}
+
+.brand-link .brand-text {
+  margin-top: 0 !important;
+  line-height: 1 !important;
+}
