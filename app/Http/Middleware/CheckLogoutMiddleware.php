@@ -40,6 +40,15 @@ class CheckLogoutMiddleware
         if (!session('user_login') && !$isPublic) {
             return redirect('/login');
         } 
-        return $next($request);
+        
+        $response = $next($request);
+        
+        if (method_exists($response, 'header')) {
+            $response->header('Cache-Control', 'no-cache, no-store, max-age=0, must-revalidate');
+            $response->header('Pragma', 'no-cache');
+            $response->header('Expires', 'Sun, 02 Jan 1990 00:00:00 GMT');
+        }
+        
+        return $response;
     }
 }
