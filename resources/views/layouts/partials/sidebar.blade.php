@@ -60,7 +60,7 @@
                     <li class="nav-header">MENU PENGELOLAAN</li>
 
                     <li class="nav-item {{ (request()->segment(1) == 'managekuliah') ? 'menu-open' : '' }}">
-                        <a href="#" class="nav-link {{ (request()->segment(1) == 'managekuliah') ? 'active' : '' }}">
+                        <a href="#" class="nav-link menu-kuliah-toggle {{ (request()->segment(1) == 'managekuliah') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-school"></i>
                             <p>Kelola Perkuliahan</p>
                             <i class="right fas fa-angle-left arrow-kuliah"></i>

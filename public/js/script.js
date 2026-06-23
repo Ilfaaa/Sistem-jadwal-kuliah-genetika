@@ -401,14 +401,14 @@ $(document).ready(function () {
 
     $(".optional-input").toggle(500);
   });
-
-  $("i.fa-angle-left.arrow-kuliah").click(function (e) {
+  $(".menu-kuliah-toggle").click(function (e) {
     e.preventDefault();
+    var arrow = $(this).find("i.fa-angle-left.arrow-kuliah");
 
-    if ($(this).hasClass('rotate-n90d')) {
-      $(this).removeClass('rotate-n90d');
+    if (arrow.hasClass('rotate-n90d')) {
+      arrow.removeClass('rotate-n90d');
     } else {
-      $(this).addClass('rotate-n90d');
+      arrow.addClass('rotate-n90d');
     }
 
     $(".nav-treeview-container.treeview-kuliah").toggle(500);
