@@ -115,7 +115,7 @@
                       @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
                       <td scope="row">
                         <a href="/managekuliah/manageprodi/{{ $p->id_prodi }}/edit" class="badge badge-editTheme">
-                          <i class="fas fa-edit"></i>&nbsp;ubah
+                          <i class="fas fa-edit"></i>&nbsp;Ubah
                         </a>
 
                         <form action="/managekuliah/manageprodi/{{ $p->id_prodi }}" method="post" class="d-inline">
@@ -126,7 +126,7 @@
                             class="badge bg-maroon"
                             onclick="return confirm('Yakin ingin menghapus Program Studi ini?')"
                           >
-                            <i class="fas fa-trash-alt"></i>&nbsp;delete
+                            <i class="fas fa-trash-alt"></i>&nbsp;Delete
                           </button>
                         </form>
                       </td>

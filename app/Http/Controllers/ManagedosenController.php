@@ -67,7 +67,7 @@ class ManagedosenController extends Controller
         if ($request->keyword) {
             $keyword = $request->keyword;
             // Kode Aman (Nested Query Builder & Parameter Binding) setelah Refactoring (Pengujian Tahap II)
-            $dosen = Dosen::where(function($q) use ($keyword) {
+            $dosen = Dosen::with('user')->where(function($q) use ($keyword) {
                 $q->where('nama', 'LIKE', '%' . $keyword . '%')
                   ->orWhere('program_studi', 'LIKE', '%' . $keyword . '%')
                   ->orWhere('kode_dosen', 'LIKE', '%' . $keyword . '%')
@@ -76,7 +76,7 @@ class ManagedosenController extends Controller
 
             $request_keyword = $request->keyword;
         } else {
-            $dosen = Dosen::get();
+            $dosen = Dosen::with('user')->get();
         }
 
         return view('managedosen.index', compact('dosen', 'user_login', 'request_keyword', 'countRequest'));

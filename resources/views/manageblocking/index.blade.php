@@ -355,6 +355,13 @@
 <section class="content">
     <div class="container-fluid">
 
+        @if(isset($belumDipasangkan) && $belumDipasangkan)
+            <div class="alert alert-warning">
+                <h5><i class="fas fa-exclamation-triangle mr-2"></i>Akun Belum Dipasangkan</h5>
+                <p class="mb-0">Akun Anda belum dipasangkan ke data dosen oleh Admin. Silakan hubungi Admin untuk memasangkan akun Anda ke data dosen agar bisa menggunakan fitur pemblokiran jadwal.</p>
+            </div>
+        @else
+
         <div class="card blocking-toolbar-card">
             <div class="card-header bg-greenTheme">
                 <h3 class="card-title text-whiteTheme">
@@ -366,16 +373,22 @@
                 <div class="row">
                     <div class="col-lg-5 col-md-6">
                         <label for="kode_dosen">Pilih Dosen</label>
-                        <select id="kode_dosen" class="custom-select">
+                        <select id="kode_dosen" class="custom-select" {{ count($dosen) == 1 ? 'disabled' : '' }}>
                             @foreach($dosen as $d)
                                 <option value="{{ $d->kode_dosen }}">
                                     {{ $d->nama_proper ?? $d->nama }}
                                 </option>
                             @endforeach
                         </select>
-                        <div class="page-note">
-                            Klik tahan lalu geser ke bawah atau ke samping untuk blocking banyak slot. Drag dari slot merah untuk menghapus banyak slot.
-                        </div>
+                        @if(isset($user_login) && $user_login->role_id == 2)
+                            <div class="page-note text-info">
+                                <i class="fas fa-info-circle mr-1"></i>Anda hanya dapat memblokir jadwal untuk nama dosen Anda sendiri.
+                            </div>
+                        @else
+                            <div class="page-note">
+                                Klik tahan lalu geser ke bawah atau ke samping untuk blocking banyak slot. Drag dari slot merah untuk menghapus banyak slot.
+                            </div>
+                        @endif
                     </div>
 
                     <div class="col-lg-7 col-md-6">
@@ -482,6 +495,8 @@
                 </div>
             </div>
         </div>
+
+        @endif
 
     </div>
 </section>

@@ -138,7 +138,7 @@
                       <td scope="row">
                         <form action="/managekuliah/managekelas/{{ $k->kode_kelas }}/{{ $tahunUrl }}/edit" method="get" class="d-inline">
                           <button type="submit" class="badge badge-editTheme">
-                            <i class="fas fa-edit"></i>&nbsp;ubah
+                            <i class="fas fa-edit"></i>&nbsp;Ubah
                           </button>
                         </form>
 
@@ -146,7 +146,7 @@
                           @method('delete')
                           @csrf
                           <button type="submit" class="badge bg-maroon" onclick="return confirm('Yakin ingin menghapus data ini?')">
-                            <i class="fas fa-trash-alt"></i>&nbsp;delete
+                            <i class="fas fa-trash-alt"></i>&nbsp;Delete
                           </button>
                         </form>
                       </td>

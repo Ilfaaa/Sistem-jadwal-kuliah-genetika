@@ -42,6 +42,11 @@ Route::group(['middleware' => 'CheckLogoutMiddleware'], function () {
         Route::get('/manageusers/{id}/edit', 'ManageusersController@edit');
         Route::patch('/manageusers/{id}', 'ManageusersController@update');
 
+        // Assign Dosen Routes
+        Route::get('/manageusers/{id}/assign-dosen', 'ManageusersController@assignDosenForm')->name('manageusers.assign-dosen');
+        Route::post('/manageusers/{id}/assign-dosen', 'ManageusersController@assignDosen')->name('manageusers.assign-dosen.store');
+        Route::post('/manageusers/{id}/unassign-dosen', 'ManageusersController@unassignDosen')->name('manageusers.unassign-dosen');
+
     });
 
     Route::group(['middleware' => 'CheckNotMahasiswaMiddleware'], function () {
@@ -120,6 +125,7 @@ Route::group(['middleware' => 'CheckLogoutMiddleware'], function () {
             Route::get('/generatejadwal', [PenjadwalankuliahController::class, 'generatejadwalform'])->name('generatejadwal.form');
             Route::get('/generatejadwal/action', [PenjadwalankuliahController::class, 'generate_action'])->name('generatejadwal.action');
             Route::post('/generatejadwal', [PenjadwalankuliahController::class, 'generatejadwal'])->name('generatejadwal.process');
+            Route::post('/generatejadwal/pindah-online/{jadwal_index}/{row_index}', [PenjadwalankuliahController::class, 'pindahJadwalOnline'])->name('generatejadwal.pindah-online');
         });
     });
 

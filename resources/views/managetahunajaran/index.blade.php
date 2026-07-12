@@ -98,7 +98,7 @@
                           @csrf
                           <button type="submit" class="badge bg-maroon"
                             onclick="return confirm('PERHATIAN: Menghapus tahun ajaran {{ $s['tahun_ajaran'] }} akan menghapus SEMUA data terkait (mata kuliah, kelas, jadwal). Yakin ingin melanjutkan?')">
-                            <i class="fas fa-trash-alt"></i>&nbsp;hapus
+                            <i class="fas fa-trash-alt"></i>&nbsp;Hapus
                           </button>
                         </form>
                       </td>

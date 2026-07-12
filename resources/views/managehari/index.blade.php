@@ -97,7 +97,7 @@
                         @method('delete')
                         @csrf
                         <button type="submit" class="badge bg-maroon">
-                          <i class="fas fa-trash-alt"></i>&nbsp;delete
+                          <i class="fas fa-trash-alt"></i>&nbsp;Delete
                         </button>
                       </form>
                     </td>

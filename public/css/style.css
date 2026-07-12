@@ -466,6 +466,10 @@ input:checked + .slider:before {
 .verticalTableHeader .p-detail:before{ padding-top: 190%; }
 
 table { text-align: center; }
+table.table th, table.table td {
+  vertical-align: middle !important;
+  text-align: center !important;
+}
 
 /* =========================
    SCROLLBAR (rebrand)

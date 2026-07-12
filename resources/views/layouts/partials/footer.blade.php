@@ -107,5 +107,16 @@
   });
 </script>
 
+<!-- Auto-dismiss alerts after 10 seconds -->
+<script>
+  $(function() {
+    setTimeout(function() {
+      $('.alert').fadeOut('slow', function() {
+        $(this).remove();
+      });
+    }, 10000);
+  });
+</script>
+
 </body>
 </html>

@@ -23,7 +23,12 @@ class Dosen extends Model
     ];
 
     public function getNamaProperAttribute()
-{
-    return ucwords(strtolower($this->nama));
-}
+    {
+        return ucwords(strtolower($this->nama));
+    }
+
+    public function user()
+    {
+        return $this->hasOne(User::class, 'kode_dosen', 'kode_dosen');
+    }
 }

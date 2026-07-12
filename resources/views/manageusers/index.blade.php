@@ -79,13 +79,14 @@
                   <th scope="col">Email</th>
                   <th scope="col">Status</th>
                   <th scope="col">Aktif</th>
+                  <th scope="col">Dosen Terpasang</th>
                   <th scope="col">Action</th>
                 </tr>
               </thead>
               <tbody>
                 @if(count($users) == 0)
                   <tr>
-                    <td scope="row" colspan="6" class="text-center text-bold text-danger">
+                    <td scope="row" colspan="7" class="text-center text-bold text-danger">
                       Users Not Found!
                     </td>
                   </tr>
@@ -109,17 +110,43 @@
                     </td>
                     <td scope="row">{{ $user->is_active == 1 ? "Aktif" : "Non Aktif" }}</td>
                     <td scope="row">
+                      @if($user->role_id == 2 && $user->kode_dosen)
+                        <span class="badge badge-success">
+                          <i class="fas fa-user-check mr-1"></i>{{ ucwords(strtolower($user->nama_dosen)) }}
+                        </span>
+                      @elseif($user->role_id == 2)
+                        <span class="badge badge-warning text-dark">
+                          <i class="fas fa-exclamation-triangle mr-1"></i>Belum Dipasangkan
+                        </span>
+                      @else
+                        <span class="text-muted">-</span>
+                      @endif
+                    </td>
+                    <td scope="row">
                       <form action="/manageusers/{{ $user->id_user }}/edit" method="get" class="d-inline">
                         <button type="submit" class="badge badge-editTheme">
-                          <i class="fas fa-user-edit"></i>&nbsp;ubah
+                          <i class="fas fa-user-edit"></i>&nbsp;Ubah
                         </button>
                       </form>
+
+                      @if($user->role_id == 2 && !$user->kode_dosen)
+                        <a href="/manageusers/{{ $user->id_user }}/assign-dosen" class="badge badge-info" style="border:none; text-decoration:none;">
+                          <i class="fas fa-link"></i>&nbsp;Pasangkan Dosen
+                        </a>
+                      @elseif($user->role_id == 2 && $user->kode_dosen)
+                        <form action="/manageusers/{{ $user->id_user }}/unassign-dosen" method="post" class="d-inline" onsubmit="return confirm('Yakin ingin melepas pemetaan dosen dari akun ini?');">
+                          @csrf
+                          <button type="submit" class="badge badge-secondary" style="border:none;">
+                            <i class="fas fa-unlink"></i>&nbsp;Lepas Dosen
+                          </button>
+                        </form>
+                      @endif
 
                       <form action="/manageusers/{{ $user->id_user }}" method="post" class="d-inline">
                         @method('delete')
                         @csrf
                         <button type="submit" class="badge bg-maroon">
-                          <i class="fas fa-user-times"></i>&nbsp;delete
+                          <i class="fas fa-user-times"></i>&nbsp;Delete
                         </button>
                       </form>
                     </td>

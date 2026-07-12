@@ -117,7 +117,7 @@
                                 class="badge bg-warning"
                                 data-toggle="modal"
                                 data-target="#{{ $modalId }}">
-                          <i class="fas fa-search"></i>&nbsp;detail
+                          <i class="fas fa-search"></i>&nbsp;Detail
                         </button>
                       </td>
                     </tr>

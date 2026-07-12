@@ -11,7 +11,7 @@
   }
 
   .jadwal-grid {
-    min-width: 1350px;
+    min-width: 1500px;
     table-layout: fixed;
     font-size: 13px;
     margin-bottom: 0 !important;
@@ -147,6 +147,22 @@
     background: #FED7AA;
   }
 
+  .jadwal-item-online {
+    background: #E9D5FF;
+    border-left-color: #8b5cf6;
+    border-color: #c4b5fd;
+  }
+  .jadwal-item-online .jadwal-matkul {
+    color: #4c1d95;
+  }
+  .jadwal-item-online .jadwal-dosen {
+    color: #6d28d9;
+  }
+
+  .legend-online {
+    background: #E9D5FF;
+  }
+
   .jadwal-matkul {
     font-weight: 700;
     text-transform: capitalize;
@@ -206,7 +222,7 @@
 </style>
 
 @php
-  $hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+  $hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu', 'Jadwal Online'];
   $hariAktifList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
   $normalJam = function ($jam) {
@@ -239,6 +255,7 @@
       if ($hari === 'jumat') return 'Jumat';
       if ($hari === 'sabu' || $hari === 'sabtu') return 'Sabtu';
       if ($hari === 'minggu') return 'Minggu';
+      if ($hari === 'jadwal online' || $hari === 'online') return 'Jadwal Online';
 
       return ucwords($hari);
   };
@@ -374,6 +391,9 @@
               <span class="jadwal-legend-item">
                 <span class="jadwal-legend-color legend-praktikum"></span> Praktikum
               </span>
+              <span class="jadwal-legend-item">
+                <span class="jadwal-legend-color legend-online"></span> Jadwal Online
+              </span>
             </div>
           </div>
 
@@ -430,8 +450,11 @@
                                   // Tentukan kelas warna berdasarkan jenis & tipe matkul
                                   $jenisItem = strtolower($item->jenis_matkul ?? 'teori');
                                   $tipeItem  = strtolower($item->tipe_matkul ?? 'wajib');
+                                  $isOnline = ($item->hari ?? '') === 'Jadwal Online';
 
-                                  if ($jenisItem === 'praktikum') {
+                                  if ($isOnline) {
+                                      $warnaClass = 'jadwal-item-online';
+                                  } elseif ($jenisItem === 'praktikum') {
                                       $warnaClass = 'jadwal-item-praktikum';
                                   } elseif ($tipeItem === 'pilihan') {
                                       $warnaClass = 'jadwal-item-pilihan';
@@ -469,7 +492,7 @@
                     @endif
                   @empty
                     <tr>
-                      <td colspan="8" class="jadwal-empty-message">
+                      <td colspan="9" class="jadwal-empty-message">
                         Belum ada data jadwal untuk semester ini.
                       </td>
                     </tr>

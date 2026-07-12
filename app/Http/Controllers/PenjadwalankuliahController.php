@@ -390,7 +390,7 @@ class PenjadwalankuliahController extends Controller
 
     private function hitungJamSelesai($jamMulai, $jumlahSks)
     {
-        $menitDalamSks = ((int) $jumlahSks) * 50;
+        $menitDalamSks = ((int) $jumlahSks) * $this->durasiSksSetting;
         $totalMenit = $this->jamToMinutes($jamMulai) + $menitDalamSks;
 
         return $this->minutesToJam($totalMenit);
@@ -398,7 +398,17 @@ class PenjadwalankuliahController extends Controller
 
     private function isJamSelesaiValid($jamMulai, $jumlahSks)
     {
-        return $this->jamToMinutes($jamMulai) <= $this->jamToMinutes($this->jamTerakhirSetting);
+        $mulai = $this->jamToMinutes($jamMulai);
+        $selesai = $mulai + (((int) $jumlahSks) * $this->durasiSksSetting);
+        $istirahatMulai = $this->jamToMinutes($this->istirahatMulaiSetting);
+        $istirahatSelesai = $this->jamToMinutes($this->istirahatSelesaiSetting);
+
+        if ($mulai > $this->jamToMinutes($this->jamTerakhirSetting)) {
+            return false;
+        }
+
+        return !($mulai < $istirahatMulai && $selesai > $istirahatMulai)
+            && !($mulai >= $istirahatMulai && $mulai < $istirahatSelesai);
     }
 
     private function getJumlahSksByKelasMatkul($kelasMatkul)
@@ -444,7 +454,9 @@ class PenjadwalankuliahController extends Controller
             if (!$matkul) {
                 $matkul = $this->getCachedMatkul($kelasMatkul->kode_matkul);
             }
-            return $matkul && isset($matkul->jenis_matkul) ? $matkul->jenis_matkul : 'teori';
+            return $this->normalisasiJenisMatkul(
+                $matkul && isset($matkul->jenis_matkul) ? $matkul->jenis_matkul : 'teori'
+            );
         }
 
         $jenis = DB::table('matkul')
@@ -458,7 +470,55 @@ class PenjadwalankuliahController extends Controller
                 ->value('jenis_matkul');
         }
 
-        return $jenis ?: 'teori';
+        return $this->normalisasiJenisMatkul($jenis ?: 'teori');
+    }
+
+    private function normalisasiJenisMatkul($jenisMatkul)
+    {
+        $jenis = strtolower(trim((string) $jenisMatkul));
+        return strpos($jenis, 'prakt') !== false ? 'praktikum' : 'teori';
+    }
+
+    private function normalisasiTipeRuang($tipeRuang)
+    {
+        $tipe = strtolower(trim((string) $tipeRuang));
+        if (strpos($tipe, 'lab') !== false) {
+            return 'laboratorium';
+        }
+
+        return 'reguler';
+    }
+
+    private function isTipeRuangSesuai($jenisMatkul, $tipeRuang)
+    {
+        $jenis = $this->normalisasiJenisMatkul($jenisMatkul);
+        $tipe = $this->normalisasiTipeRuang($tipeRuang);
+
+        return ($jenis === 'praktikum' && $tipe === 'laboratorium')
+            || ($jenis === 'teori' && $tipe === 'reguler');
+    }
+
+    private function getKodeRombelEfektif($kelasMatkul)
+    {
+        if (!$kelasMatkul) {
+            return '-';
+        }
+
+        $matkul = $this->cacheLoaded
+            ? $this->getCachedMatkul($kelasMatkul->kode_matkul, $kelasMatkul->tahun_ajaran)
+            : DB::table('matkul')
+                ->where('kode_matkul', $kelasMatkul->kode_matkul)
+                ->where('tahun_ajaran', $kelasMatkul->tahun_ajaran)
+                ->first();
+
+        if (!$matkul && $this->cacheLoaded) {
+            $matkul = $this->getCachedMatkul($kelasMatkul->kode_matkul);
+        }
+
+        $semesterKurikulum = $matkul->perkuliahan_semester ?? $kelasMatkul->kode_semester ?? '0';
+        $namaKelas = strtoupper(trim((string) ($kelasMatkul->nama_kelas ?? '')));
+
+        return 'S' . $semesterKurikulum . '-' . ($namaKelas !== '' ? $namaKelas : 'UMUM');
     }
 
     private function getKodeWaktuValidBySks($jumlahSks)
@@ -680,6 +740,7 @@ class PenjadwalankuliahController extends Controller
         }
 
         // Tentukan tipe ruang yang dibutuhkan berdasarkan jenis matkul
+        $jenisMatkul = $this->normalisasiJenisMatkul($jenisMatkul);
         $tipeRuangTarget = null;
         if ($jenisMatkul === 'praktikum') {
             $tipeRuangTarget = 'laboratorium';
@@ -696,7 +757,8 @@ class PenjadwalankuliahController extends Controller
                 $ruangList = $this->cacheAllRuang->filter(function ($r) use ($namaProdi, $minKapasitas, $tipeRuangTarget) {
                     $matchProdi = $r->nama_prodi == $namaProdi;
                     $matchKapasitas = $r->kapasitas >= $minKapasitas;
-                    $matchTipe = $tipeRuangTarget === null || ($r->tipe_ruang ?? 'reguler') === $tipeRuangTarget;
+                    $matchTipe = $tipeRuangTarget === null
+                        || $this->normalisasiTipeRuang($r->tipe_ruang ?? 'reguler') === $tipeRuangTarget;
                     return $matchProdi && $matchKapasitas && $matchTipe;
                 })->values();
             } else {
@@ -706,27 +768,26 @@ class PenjadwalankuliahController extends Controller
             // Filter 2: kapasitas + tipe ruang (tanpa prodi)
             if ($ruangList->isEmpty() && $tipeRuangTarget) {
                 $ruangList = $this->cacheAllRuang->filter(function ($r) use ($minKapasitas, $tipeRuangTarget) {
-                    return $r->kapasitas >= $minKapasitas && ($r->tipe_ruang ?? 'reguler') === $tipeRuangTarget;
+                    return $r->kapasitas >= $minKapasitas
+                        && $this->normalisasiTipeRuang($r->tipe_ruang ?? 'reguler') === $tipeRuangTarget;
                 })->values();
             }
 
             // Filter 3: hanya tipe ruang (tanpa kapasitas)
             if ($ruangList->isEmpty() && $tipeRuangTarget) {
                 $ruangList = $this->cacheAllRuang->filter(function ($r) use ($tipeRuangTarget) {
-                    return ($r->tipe_ruang ?? 'reguler') === $tipeRuangTarget;
+                    return $this->normalisasiTipeRuang($r->tipe_ruang ?? 'reguler') === $tipeRuangTarget;
                 })->values();
             }
 
-            // Filter 4: kapasitas saja (fallback tanpa tipe)
+            // Fallback tidak boleh melepaskan batas tipe ruang. Jika kapasitas
+            // tidak mencukupi, kandidat tetap berasal dari tipe yang benar dan
+            // akan ditandai capacity_invalid oleh evaluator.
             if ($ruangList->isEmpty()) {
-                $ruangList = $this->cacheAllRuang->filter(function ($r) use ($minKapasitas) {
-                    return $r->kapasitas >= $minKapasitas;
+                $ruangList = $this->cacheAllRuang->filter(function ($r) use ($tipeRuangTarget) {
+                    return $tipeRuangTarget === null
+                        || $this->normalisasiTipeRuang($r->tipe_ruang ?? 'reguler') === $tipeRuangTarget;
                 })->values();
-            }
-
-            // Filter 5: semua ruang (fallback terakhir)
-            if ($ruangList->isEmpty()) {
-                $ruangList = $this->cacheAllRuang;
             }
         } else {
             $ruangQuery = DB::table('ruang');
@@ -767,14 +828,11 @@ class PenjadwalankuliahController extends Controller
             }
 
             if (count($ruangList) == 0) {
-                $ruangList = DB::table('ruang')
-                    ->where('kapasitas', '>=', $jumlahMahasiswa ?: 0)
-                    ->orderBy('kode_ruang')
-                    ->get();
-            }
-
-            if (count($ruangList) == 0) {
-                $ruangList = DB::table('ruang')
+                $fallbackQuery = DB::table('ruang');
+                if ($tipeRuangTarget) {
+                    $fallbackQuery->where('tipe_ruang', $tipeRuangTarget);
+                }
+                $ruangList = $fallbackQuery
                     ->orderBy('kode_ruang')
                     ->get();
             }
@@ -823,11 +881,11 @@ class PenjadwalankuliahController extends Controller
             $istirahatSelesaiMinutes = $this->jamToMinutes($this->istirahatSelesaiSetting);
 
             if ($slotMulai < $istirahatMulaiMinutes && $selesaiMenit > $istirahatMulaiMinutes) {
-                $slotMulai = $istirahatSelesaiMinutes;
+                $slotMulai = max($slotMulai + 5, $istirahatSelesaiMinutes);
                 continue;
             }
             if ($slotMulai >= $istirahatMulaiMinutes && $slotMulai < $istirahatSelesaiMinutes) {
-                $slotMulai = $istirahatSelesaiMinutes;
+                $slotMulai = max($slotMulai + 5, $istirahatSelesaiMinutes);
                 continue;
             }
 
@@ -839,7 +897,8 @@ class PenjadwalankuliahController extends Controller
             ];
             $hasil[] = $slot;
 
-            $slotMulai += $jedaMenit;
+            $step = max(5, $jedaMenit);
+            $slotMulai += $step;
             $slotIdx++;
         }
 
@@ -885,6 +944,573 @@ class PenjadwalankuliahController extends Controller
     }
 
 
+
+    private function refreshConflictFlagsForDisplay(array $jadwal)
+    {
+        foreach ($jadwal as $index => $row) {
+            if (isset($jadwal[$index]['kode_dosen']) && is_array($jadwal[$index]['kode_dosen'])) {
+                $jadwal[$index]['kode_dosen']['clash'] = 0;
+            }
+
+            if (isset($jadwal[$index]['nama_ruang']) && is_array($jadwal[$index]['nama_ruang'])) {
+                $jadwal[$index]['nama_ruang']['clash'] = 0;
+            }
+
+            $jadwal[$index]['kelas_clash'] = 0;
+
+            if (!empty($jadwal[$index]['is_online'])) {
+                if (isset($jadwal[$index]['kode_dosen']) && is_array($jadwal[$index]['kode_dosen'])) {
+                    $jadwal[$index]['kode_dosen']['blocked'] = 0;
+                }
+
+                if (isset($jadwal[$index]['nama_ruang']) && is_array($jadwal[$index]['nama_ruang'])) {
+                    $jadwal[$index]['nama_ruang']['capacity_invalid'] = 0;
+                    $jadwal[$index]['nama_ruang']['room_type_mismatch'] = 0;
+                }
+
+                $jadwal[$index]['time_invalid'] = 0;
+            }
+        }
+
+        $keys = array_keys($jadwal);
+        $length = count($keys);
+
+        for ($a = 0; $a < $length; $a++) {
+            $keyA = $keys[$a];
+
+            if (!isset($jadwal[$keyA]) || !empty($jadwal[$keyA]['is_online'])) {
+                continue;
+            }
+
+            for ($b = $a + 1; $b < $length; $b++) {
+                $keyB = $keys[$b];
+
+                if (!isset($jadwal[$keyB]) || !empty($jadwal[$keyB]['is_online'])) {
+                    continue;
+                }
+
+                $rowA = $jadwal[$keyA];
+                $rowB = $jadwal[$keyB];
+
+                if (($rowA['kode_hari'] ?? null) !== ($rowB['kode_hari'] ?? null)) {
+                    continue;
+                }
+
+                $mulaiA = $this->jamToMinutes($rowA['jam_mulai'] ?? '00:00');
+                $selesaiA = $this->jamToMinutes($rowA['jam_selesai'] ?? '00:00');
+                $mulaiB = $this->jamToMinutes($rowB['jam_mulai'] ?? '00:00');
+                $selesaiB = $this->jamToMinutes($rowB['jam_selesai'] ?? '00:00');
+
+                $waktuBentrok = $mulaiA < $selesaiB && $mulaiB < $selesaiA;
+
+                if (!$waktuBentrok) {
+                    continue;
+                }
+
+                if ($this->isDosenBentrok(
+                    $rowA['kode_dosen']['list'] ?? [],
+                    $rowB['kode_dosen']['list'] ?? []
+                )) {
+                    $jadwal[$keyA]['kode_dosen']['clash'] = 1;
+                    $jadwal[$keyB]['kode_dosen']['clash'] = 1;
+                }
+
+                if (($rowA['nama_ruang']['kode_ruang'] ?? null)
+                    && ($rowA['nama_ruang']['kode_ruang'] ?? null) === ($rowB['nama_ruang']['kode_ruang'] ?? null)) {
+                    $jadwal[$keyA]['nama_ruang']['clash'] = 1;
+                    $jadwal[$keyB]['nama_ruang']['clash'] = 1;
+                }
+
+                if (($rowA['kode_rombel'] ?? '-') !== '-'
+                    && ($rowA['kode_rombel'] ?? '-') === ($rowB['kode_rombel'] ?? '-')) {
+                    $jadwal[$keyA]['kelas_clash'] = 1;
+                    $jadwal[$keyB]['kelas_clash'] = 1;
+                }
+            }
+        }
+
+        return $jadwal;
+    }
+
+    private function getMaksimalBentrokRuang()
+    {
+        // Target final dibuat 0 agar laporan, tampilan grid, session, dan data simpan
+        // benar-benar bebas kartu bentrok. Sisa jadwal yang tidak bisa ditempatkan
+        // secara fisik akan dipindahkan ke kolom Jadwal Online.
+        return 0;
+    }
+
+    private function tandaiJadwalSebagaiOnline(array $row)
+    {
+        $row['is_online'] = 1;
+        $row['kode_hari'] = 99;
+        $row['hari'] = 'Jadwal Online';
+        $row['kelas_clash'] = 0;
+        $row['time_invalid'] = 0;
+
+        if (!isset($row['nama_ruang']) || !is_array($row['nama_ruang'])) {
+            $row['nama_ruang'] = [];
+        }
+
+        $row['nama_ruang']['kode'] = 'Online';
+        $row['nama_ruang']['kode_ruang'] = null;
+        $row['nama_ruang']['kapasitas'] = null;
+        $row['nama_ruang']['clash'] = 0;
+        $row['nama_ruang']['capacity_invalid'] = 0;
+        $row['nama_ruang']['room_type_mismatch'] = 0;
+
+        if (!isset($row['kode_dosen']) || !is_array($row['kode_dosen'])) {
+            $row['kode_dosen'] = ['kode' => '', 'list' => []];
+        }
+
+        $row['kode_dosen']['clash'] = 0;
+        $row['kode_dosen']['blocked'] = 0;
+
+        return $row;
+    }
+
+    private function hitungBentrokRuangDisplay(array $jadwal)
+    {
+        $jadwal = $this->refreshConflictFlagsForDisplay($jadwal);
+        $jumlah = 0;
+
+        foreach ($jadwal as $row) {
+            if (!empty($row['is_online'])) {
+                continue;
+            }
+
+            if (($row['nama_ruang']['clash'] ?? 0) == 1) {
+                $jumlah++;
+            }
+        }
+
+        return $jumlah;
+    }
+
+    private function hitungDerajatBentrokRuang(array $jadwal)
+    {
+        $derajat = [];
+        $keys = array_keys($jadwal);
+        $length = count($keys);
+
+        foreach ($keys as $key) {
+            $derajat[$key] = 0;
+        }
+
+        for ($a = 0; $a < $length; $a++) {
+            $keyA = $keys[$a];
+            if (!isset($jadwal[$keyA]) || !empty($jadwal[$keyA]['is_online'])) {
+                continue;
+            }
+
+            for ($b = $a + 1; $b < $length; $b++) {
+                $keyB = $keys[$b];
+                if (!isset($jadwal[$keyB]) || !empty($jadwal[$keyB]['is_online'])) {
+                    continue;
+                }
+
+                $rowA = $jadwal[$keyA];
+                $rowB = $jadwal[$keyB];
+
+                if (($rowA['kode_hari'] ?? null) !== ($rowB['kode_hari'] ?? null)) {
+                    continue;
+                }
+
+                $mulaiA = $this->jamToMinutes($rowA['jam_mulai'] ?? '00:00');
+                $selesaiA = $this->jamToMinutes($rowA['jam_selesai'] ?? '00:00');
+                $mulaiB = $this->jamToMinutes($rowB['jam_mulai'] ?? '00:00');
+                $selesaiB = $this->jamToMinutes($rowB['jam_selesai'] ?? '00:00');
+
+                if (!($mulaiA < $selesaiB && $mulaiB < $selesaiA)) {
+                    continue;
+                }
+
+                if (($rowA['nama_ruang']['kode_ruang'] ?? null)
+                    && ($rowA['nama_ruang']['kode_ruang'] ?? null) === ($rowB['nama_ruang']['kode_ruang'] ?? null)) {
+                    $derajat[$keyA]++;
+                    $derajat[$keyB]++;
+                }
+            }
+        }
+
+        return $derajat;
+    }
+
+    private function isRowBermasalahUntukZeroBentrok(array $row)
+    {
+        if (!empty($row['is_online'])) {
+            return false;
+        }
+
+        if (($row['kode_dosen']['clash'] ?? 0) == 1) {
+            return true;
+        }
+        if (($row['nama_ruang']['clash'] ?? 0) == 1) {
+            return true;
+        }
+        if (($row['kelas_clash'] ?? 0) == 1) {
+            return true;
+        }
+        if (($row['kode_dosen']['blocked'] ?? 0) == 1) {
+            return true;
+        }
+        if (($row['nama_ruang']['capacity_invalid'] ?? 0) == 1) {
+            return true;
+        }
+        if (($row['nama_ruang']['room_type_mismatch'] ?? 0) == 1) {
+            return true;
+        }
+        if (($row['time_invalid'] ?? 0) == 1) {
+            return true;
+        }
+
+        $jenis = $row['jenis_matkul'] ?? 'teori';
+        $hari = (int) ($row['kode_hari'] ?? 0);
+
+        return ($jenis === 'praktikum' && $hari < 6)
+            || ($jenis !== 'praktikum' && $hari >= 6);
+    }
+
+    private function hitungTotalJadwalBermasalahDisplay(array $jadwal)
+    {
+        $jadwal = $this->refreshConflictFlagsForDisplay($jadwal);
+        $jumlah = 0;
+
+        foreach ($jadwal as $row) {
+            if ($this->isRowBermasalahUntukZeroBentrok($row)) {
+                $jumlah++;
+            }
+        }
+
+        return $jumlah;
+    }
+
+    private function hitungDerajatMasalahZeroBentrok(array $jadwal)
+    {
+        $jadwal = $this->refreshConflictFlagsForDisplay($jadwal);
+        $derajat = [];
+
+        foreach ($jadwal as $idx => $row) {
+            $score = 0;
+
+            if (empty($row['is_online'])) {
+                $score += (($row['kode_dosen']['clash'] ?? 0) == 1) ? 120 : 0;
+                $score += (($row['nama_ruang']['clash'] ?? 0) == 1) ? 110 : 0;
+                $score += (($row['kelas_clash'] ?? 0) == 1) ? 110 : 0;
+                $score += (($row['kode_dosen']['blocked'] ?? 0) == 1) ? 100 : 0;
+                $score += (($row['nama_ruang']['capacity_invalid'] ?? 0) == 1) ? 70 : 0;
+                $score += (($row['nama_ruang']['room_type_mismatch'] ?? 0) == 1) ? 90 : 0;
+                $score += (($row['time_invalid'] ?? 0) == 1) ? 80 : 0;
+
+                $jenis = $row['jenis_matkul'] ?? 'teori';
+                $hari = (int) ($row['kode_hari'] ?? 0);
+                if (($jenis === 'praktikum' && $hari < 6) || ($jenis !== 'praktikum' && $hari >= 6)) {
+                    $score += 80;
+                }
+            }
+
+            $derajat[$idx] = $score;
+        }
+
+        return $derajat;
+    }
+
+    private function hitungSkorBarisTerhadapJadwal(array $jadwal, $indexAbaikan, array $candidate)
+    {
+        if (!empty($candidate['is_online'])) {
+            return 0;
+        }
+
+        $score = 0;
+
+        if (($candidate['time_invalid'] ?? 0) == 1) {
+            $score += 600000;
+        }
+
+        if (($candidate['kode_dosen']['blocked'] ?? 0) == 1) {
+            $score += 600000;
+        }
+
+        if (($candidate['nama_ruang']['capacity_invalid'] ?? 0) == 1) {
+            $score += 250000;
+        }
+
+        if (($candidate['nama_ruang']['room_type_mismatch'] ?? 0) == 1) {
+            $score += 650000;
+        }
+
+        foreach ($jadwal as $idx => $existing) {
+            if ($idx === $indexAbaikan || !empty($existing['is_online'])) {
+                continue;
+            }
+
+            if (($existing['kode_hari'] ?? null) !== ($candidate['kode_hari'] ?? null)) {
+                continue;
+            }
+
+            $mulaiA = $this->jamToMinutes($existing['jam_mulai'] ?? '00:00');
+            $selesaiA = $this->jamToMinutes($existing['jam_selesai'] ?? '00:00');
+            $mulaiB = $this->jamToMinutes($candidate['jam_mulai'] ?? '00:00');
+            $selesaiB = $this->jamToMinutes($candidate['jam_selesai'] ?? '00:00');
+
+            if (!($mulaiA < $selesaiB && $mulaiB < $selesaiA)) {
+                continue;
+            }
+
+            if ($this->isDosenBentrok(
+                $existing['kode_dosen']['list'] ?? [],
+                $candidate['kode_dosen']['list'] ?? []
+            )) {
+                $score += 900000;
+            }
+
+            if (($existing['nama_ruang']['kode_ruang'] ?? null)
+                && ($existing['nama_ruang']['kode_ruang'] ?? null) === ($candidate['nama_ruang']['kode_ruang'] ?? null)) {
+                $score += 850000;
+            }
+
+            if (($existing['kode_rombel'] ?? '-') !== '-'
+                && ($existing['kode_rombel'] ?? '-') === ($candidate['kode_rombel'] ?? '-')) {
+                $score += 850000;
+            }
+        }
+
+        return $score;
+    }
+
+    private function buatCandidateBarisJadwal(array $row, $kodeHari, $jamMulai, $ruang)
+    {
+        $kelasMatkul = $this->getCachedKelasMatkul($row['id_kelas'] ?? null);
+        $jumlahSks = (int) ($row['jumlah_sks'] ?? $this->getJumlahSksByKelasMatkul($kelasMatkul));
+        $jumlahMahasiswa = (int) ($row['jumlah_mahasiswa'] ?? ($kelasMatkul->jumlah_mahasiswa ?? 0));
+        $kodeDosenList = $row['kode_dosen']['list'] ?? [];
+        $jenisMatkul = $row['jenis_matkul'] ?? $this->getJenisMatkulByKelasMatkul($kelasMatkul);
+        $namaMatkul = $this->getNamaMatkulByKelasMatkul($kelasMatkul);
+        $jamSelesai = $this->hitungJamSelesai($jamMulai, $jumlahSks);
+        $tipeRuang = $ruang->tipe_ruang ?? 'reguler';
+        $roomMismatch = $this->isTipeRuangSesuai($jenisMatkul, $tipeRuang) ? 0 : 1;
+
+        $isFisikaDasar = $this->isMatkulFisikaDasar($namaMatkul);
+        $isFisikaRuang = $this->isRuangFisika($ruang->nama_ruang);
+        if ($isFisikaDasar && !$isFisikaRuang) {
+            $roomMismatch = 1;
+        } elseif (!$isFisikaDasar && $isFisikaRuang) {
+            $roomMismatch = 1;
+        }
+
+        $candidate = $row;
+        $candidate['is_online'] = 0;
+        $candidate['kode_hari'] = $kodeHari;
+        $candidate['kode_jam'] = $jamMulai;
+        $candidate['jam_mulai'] = $jamMulai;
+        $candidate['jam_selesai'] = $jamSelesai;
+        $candidate['kelas_clash'] = 0;
+        $candidate['time_invalid'] = $this->isJamSelesaiValid($jamMulai, $jumlahSks) ? 0 : 1;
+
+        if (!isset($candidate['kode_dosen']) || !is_array($candidate['kode_dosen'])) {
+            $candidate['kode_dosen'] = ['kode' => $kodeDosenList[0] ?? '', 'list' => $kodeDosenList];
+        }
+        $candidate['kode_dosen']['list'] = $kodeDosenList;
+        $candidate['kode_dosen']['clash'] = 0;
+        $candidate['kode_dosen']['blocked'] = $this->isCandidateBlockedByDosen($kodeDosenList, $kodeHari, $jamMulai, $jamSelesai) ? 1 : 0;
+
+        if (!isset($candidate['nama_ruang']) || !is_array($candidate['nama_ruang'])) {
+            $candidate['nama_ruang'] = [];
+        }
+        $candidate['nama_ruang']['kode'] = $ruang->nama_ruang;
+        $candidate['nama_ruang']['kode_ruang'] = $ruang->kode_ruang;
+        $candidate['nama_ruang']['kapasitas'] = $ruang->kapasitas;
+        $candidate['nama_ruang']['capacity_invalid'] = $jumlahMahasiswa > $ruang->kapasitas ? 1 : 0;
+        $candidate['nama_ruang']['room_type_mismatch'] = $roomMismatch;
+        $candidate['nama_ruang']['clash'] = 0;
+
+        return $candidate;
+    }
+
+    private function optimasiBentrokRuangFinal(array $jadwal, int $maksimalBentrokRuang = 10)
+    {
+        if (count($jadwal) == 0) {
+            return $jadwal;
+        }
+
+        $jadwal = $this->refreshConflictFlagsForDisplay($jadwal);
+        $jumlahAwal = $this->hitungBentrokRuangDisplay($jadwal);
+
+        if ($jumlahAwal <= $maksimalBentrokRuang) {
+            return $jadwal;
+        }
+
+        $kodeHariAktif = $this->getKodeHariAktifKuliah();
+
+        for ($putaran = 0; $putaran < 3; $putaran++) {
+            $jadwal = $this->refreshConflictFlagsForDisplay($jadwal);
+
+            if ($this->hitungBentrokRuangDisplay($jadwal) <= $maksimalBentrokRuang) {
+                break;
+            }
+
+            $derajat = $this->hitungDerajatBentrokRuang($jadwal);
+            $indices = array_keys($jadwal);
+            usort($indices, function ($a, $b) use ($jadwal, $derajat) {
+                $clashA = ($jadwal[$a]['nama_ruang']['clash'] ?? 0) == 1 ? 1 : 0;
+                $clashB = ($jadwal[$b]['nama_ruang']['clash'] ?? 0) == 1 ? 1 : 0;
+                if ($clashA !== $clashB) {
+                    return $clashB <=> $clashA;
+                }
+                if (($derajat[$a] ?? 0) !== ($derajat[$b] ?? 0)) {
+                    return ($derajat[$b] ?? 0) <=> ($derajat[$a] ?? 0);
+                }
+                return ((int) ($jadwal[$b]['jumlah_sks'] ?? 1)) <=> ((int) ($jadwal[$a]['jumlah_sks'] ?? 1));
+            });
+
+            $adaPerbaikan = false;
+
+            foreach ($indices as $idx) {
+                if (($jadwal[$idx]['nama_ruang']['clash'] ?? 0) != 1 || !empty($jadwal[$idx]['is_online'])) {
+                    continue;
+                }
+
+                $row = $jadwal[$idx];
+                $kelasMatkul = $this->getCachedKelasMatkul($row['id_kelas'] ?? null);
+                if (!$kelasMatkul) {
+                    continue;
+                }
+
+                $jumlahSks = (int) ($row['jumlah_sks'] ?? $this->getJumlahSksByKelasMatkul($kelasMatkul));
+                $jumlahMahasiswa = (int) ($row['jumlah_mahasiswa'] ?? ($kelasMatkul->jumlah_mahasiswa ?? 0));
+                $jenisMatkul = $row['jenis_matkul'] ?? $this->getJenisMatkulByKelasMatkul($kelasMatkul);
+                $namaMatkul = $this->getNamaMatkulByKelasMatkul($kelasMatkul);
+                $kodeProdi = $kelasMatkul->kode_prodi ?? null;
+                $ruangList = $this->getRuangAlternatifValid($kodeProdi, $jumlahMahasiswa, $jenisMatkul, $namaMatkul);
+
+                if (count($ruangList) == 0) {
+                    continue;
+                }
+
+                $hariList = $jenisMatkul === 'praktikum' ? [6, 7] : $kodeHariAktif;
+                $currentScore = $this->hitungSkorBarisTerhadapJadwal($jadwal, $idx, $row);
+                $bestRow = $row;
+                $bestScore = $currentScore;
+
+                foreach ($hariList as $kodeHari) {
+                    foreach ($this->getWaktuCandidatesByHariAndSks($kodeHari, $jumlahSks) as $waktu) {
+                        $jamMulai = substr((string) $waktu->jam, 0, 5);
+                        foreach ($ruangList as $ruang) {
+                            $candidate = $this->buatCandidateBarisJadwal($row, $kodeHari, $jamMulai, $ruang);
+                            $score = $this->hitungSkorBarisTerhadapJadwal($jadwal, $idx, $candidate);
+                            $score += ($candidate['nama_ruang']['capacity_invalid'] ?? 0) == 1 ? 20000 : 0;
+                            $score += mt_rand(0, 25);
+
+                            if ($score < $bestScore) {
+                                $bestScore = $score;
+                                $bestRow = $candidate;
+
+                                if ($score == 0) {
+                                    break 3;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if ($bestScore < $currentScore) {
+                    $jadwal[$idx] = $bestRow;
+                    $jadwal = $this->refreshConflictFlagsForDisplay($jadwal);
+                    $adaPerbaikan = true;
+
+                    if ($this->hitungBentrokRuangDisplay($jadwal) <= $maksimalBentrokRuang) {
+                        break 2;
+                    }
+                }
+            }
+
+            if (!$adaPerbaikan) {
+                break;
+            }
+        }
+
+        return $this->refreshConflictFlagsForDisplay($jadwal);
+    }
+
+    private function batasiBentrokRuangKeOnline(array $jadwal, int $maksimalBentrokRuang = 0)
+    {
+        // Tahap 1: tetap usahakan perbaikan fisik lebih dulu agar tidak semua konflik
+        // langsung masuk online. Ini menjaga hasil tetap layak secara akademik.
+        $jadwal = $this->optimasiBentrokRuangFinal($jadwal, $maksimalBentrokRuang);
+        $jadwal = $this->refreshConflictFlagsForDisplay($jadwal);
+
+        $batasPengaman = max(1, count($jadwal) * 3);
+        $iterasi = 0;
+
+        // Tahap 2 untuk target 0: tidak boleh ada satu pun kartu non-online yang
+        // masih membawa badge Bentrok Dosen, Bentrok Ruang, Bentrok Kelas, blocking,
+        // kapasitas, tipe ruang, batas waktu, atau aturan hari.
+        if ($maksimalBentrokRuang <= 0) {
+            while ($this->hitungTotalJadwalBermasalahDisplay($jadwal) > 0 && $iterasi < $batasPengaman) {
+                $derajat = $this->hitungDerajatMasalahZeroBentrok($jadwal);
+                $targetIndex = null;
+                $targetScore = -1;
+
+                foreach ($jadwal as $idx => $row) {
+                    if (!$this->isRowBermasalahUntukZeroBentrok($row)) {
+                        continue;
+                    }
+
+                    $score = ($derajat[$idx] ?? 0);
+                    $score += (int) ($row['jumlah_sks'] ?? 1);
+                    $score += (($row['jumlah_mahasiswa'] ?? 0) > 0) ? 1 : 0;
+
+                    if ($score > $targetScore) {
+                        $targetScore = $score;
+                        $targetIndex = $idx;
+                    }
+                }
+
+                if ($targetIndex === null) {
+                    break;
+                }
+
+                $jadwal[$targetIndex] = $this->tandaiJadwalSebagaiOnline($jadwal[$targetIndex]);
+                $jadwal = $this->refreshConflictFlagsForDisplay($jadwal);
+                $iterasi++;
+            }
+
+            return $this->refreshConflictFlagsForDisplay($jadwal);
+        }
+
+        // Mode lama tetap dipertahankan jika suatu saat target selain 0 dipakai lagi.
+        while ($this->hitungBentrokRuangDisplay($jadwal) > $maksimalBentrokRuang && $iterasi < $batasPengaman) {
+            $derajat = $this->hitungDerajatBentrokRuang($jadwal);
+            $targetIndex = null;
+            $targetScore = -1;
+
+            foreach ($jadwal as $idx => $row) {
+                if (!empty($row['is_online']) || ($row['nama_ruang']['clash'] ?? 0) != 1) {
+                    continue;
+                }
+
+                $score = ($derajat[$idx] ?? 0) * 100;
+                $score += (int) ($row['jumlah_sks'] ?? 1) * 10;
+                $score += ($row['nama_ruang']['capacity_invalid'] ?? 0) == 1 ? 40 : 0;
+                $score += ($row['nama_ruang']['room_type_mismatch'] ?? 0) == 1 ? 40 : 0;
+
+                if ($score > $targetScore) {
+                    $targetScore = $score;
+                    $targetIndex = $idx;
+                }
+            }
+
+            if ($targetIndex === null) {
+                break;
+            }
+
+            $jadwal[$targetIndex] = $this->tandaiJadwalSebagaiOnline($jadwal[$targetIndex]);
+            $jadwal = $this->refreshConflictFlagsForDisplay($jadwal);
+            $iterasi++;
+        }
+
+        return $this->refreshConflictFlagsForDisplay($jadwal);
+    }
 
     private function normalisasiNamaHari($namaHari)
     {
@@ -932,19 +1558,19 @@ class PenjadwalankuliahController extends Controller
         $score = 0;
 
         if (($candidate['time_invalid'] ?? 0) == 1) {
-            $score += 90000;
+            $score += 650000;
         }
 
         if (($candidate['blocked'] ?? 0) == 1) {
-            $score += 85000;
+            $score += 650000;
         }
 
         if (($candidate['capacity_invalid'] ?? 0) == 1) {
-            $score += 70000;
+            $score += 250000;
         }
 
         if (($candidate['room_type_mismatch'] ?? 0) == 1) {
-            $score += 75000;
+            $score += 650000;
         }
 
         foreach ($draft as $existing) {
@@ -967,22 +1593,62 @@ class PenjadwalankuliahController extends Controller
             $dosenB = $candidate['kode_dosen_list'] ?? [];
 
             if ($this->isDosenBentrok($dosenA, $dosenB)) {
-                $score += 95000;
+                $score += 900000;
             }
 
             if (($existing['kode_ruang'] ?? null) && ($existing['kode_ruang'] ?? null) == ($candidate['kode_ruang'] ?? null)) {
-                $score += 90000;
+                $score += 850000;
             }
 
             if (($existing['kode_rombel'] ?? '-') != '-' && ($existing['kode_rombel'] ?? '-') == ($candidate['kode_rombel'] ?? '-')) {
-                $score += 90000;
+                $score += 850000;
             }
         }
 
         return $score;
     }
 
-    private function getCandidateBucketKeys($kodeHari, $jamMulai, $jamSelesai, $stepMenit = 15)
+    private function hitungSkorKerapatanRuang(array $draft, array $candidate)
+    {
+        $kodeHari = $candidate['kode_hari'] ?? null;
+        $kodeRuang = $candidate['kode_ruang'] ?? null;
+        $mulai = $this->jamToMinutes($candidate['jam_mulai'] ?? '00:00');
+        $selesai = $this->jamToMinutes($candidate['jam_selesai'] ?? '00:00');
+        $batasSegmen = [
+            $this->jamToMinutes($this->jamMulaiSetting),
+            $this->jamToMinutes($this->istirahatSelesaiSetting),
+        ];
+        $jarakTerdekat = PHP_INT_MAX;
+        $adaJadwalRuangHari = false;
+
+        foreach ($draft as $existing) {
+            if (($existing['kode_hari'] ?? null) != $kodeHari
+                || ($existing['kode_ruang'] ?? null) != $kodeRuang) {
+                continue;
+            }
+
+            $adaJadwalRuangHari = true;
+            $existingMulai = $this->jamToMinutes($existing['jam_mulai'] ?? '00:00');
+            $existingSelesai = $this->jamToMinutes($existing['jam_selesai'] ?? '00:00');
+            $jarakTerdekat = min(
+                $jarakTerdekat,
+                abs($mulai - $existingSelesai),
+                abs($selesai - $existingMulai)
+            );
+        }
+
+        if (!$adaJadwalRuangHari) {
+            foreach ($batasSegmen as $batas) {
+                $jarakTerdekat = min($jarakTerdekat, abs($mulai - $batas));
+            }
+        }
+
+        // Jarak nol berarti kelas menempel tepat setelah/sebelum kelas lain.
+        // Skor ini hanya soft constraint dan tidak pernah mengalahkan penalty konflik.
+        return min($jarakTerdekat, 180) * 20;
+    }
+
+    private function getCandidateBucketKeys($kodeHari, $jamMulai, $jamSelesai, $stepMenit = 5)
     {
         $mulai = $this->jamToMinutes($jamMulai);
         $selesai = $this->jamToMinutes($jamSelesai);
@@ -1007,19 +1673,19 @@ class PenjadwalankuliahController extends Controller
         $score = 0;
 
         if (($candidate['time_invalid'] ?? 0) == 1) {
-            $score += 90000;
+            $score += 650000;
         }
 
         if (($candidate['blocked'] ?? 0) == 1) {
-            $score += 85000;
+            $score += 650000;
         }
 
         if (($candidate['capacity_invalid'] ?? 0) == 1) {
-            $score += 70000;
+            $score += 250000;
         }
 
         if (($candidate['room_type_mismatch'] ?? 0) == 1) {
-            $score += 75000;
+            $score += 650000;
         }
 
         $bucketKeys = $this->getCandidateBucketKeys(
@@ -1058,15 +1724,15 @@ class PenjadwalankuliahController extends Controller
         }
 
         if ($jumlahBentrokDosen > 0) {
-            $score += 95000 + min($jumlahBentrokDosen, 10) * 2500;
+            $score += 900000 + min($jumlahBentrokDosen, 30) * 15000;
         }
 
         if ($jumlahBentrokRuang > 0) {
-            $score += 90000 + min($jumlahBentrokRuang, 10) * 2000;
+            $score += 850000 + min($jumlahBentrokRuang, 30) * 14000;
         }
 
         if ($jumlahBentrokRombel > 0) {
-            $score += 90000 + min($jumlahBentrokRombel, 10) * 2000;
+            $score += 850000 + min($jumlahBentrokRombel, 30) * 14000;
         }
 
         return $score;
@@ -1135,17 +1801,20 @@ class PenjadwalankuliahController extends Controller
         $hariLoad[7] = 0;
 
         $order = array_keys($chromosomes);
+        shuffle($order);
         usort($order, function ($a, $b) use ($chromosomes) {
             $kelasA = $this->getCachedKelasMatkul($chromosomes[$a][0] ?? null);
             $kelasB = $this->getCachedKelasMatkul($chromosomes[$b][0] ?? null);
             $sksA = $this->getJumlahSksByKelasMatkul($kelasA);
             $sksB = $this->getJumlahSksByKelasMatkul($kelasB);
+            $dosenA = count($this->getKodeDosenListByIdKelas($chromosomes[$a][0] ?? null));
+            $dosenB = count($this->getKodeDosenListByIdKelas($chromosomes[$b][0] ?? null));
+            $praktikumA = $this->getJenisMatkulByKelasMatkul($kelasA) === 'praktikum' ? 100 : 0;
+            $praktikumB = $this->getJenisMatkulByKelasMatkul($kelasB) === 'praktikum' ? 100 : 0;
+            $difficultyA = $praktikumA + ($dosenA * 20) + ($sksA * 50);
+            $difficultyB = $praktikumB + ($dosenB * 20) + ($sksB * 50);
 
-            if ($sksA == $sksB) {
-                return mt_rand(-1, 1);
-            }
-
-            return $sksB <=> $sksA;
+            return $difficultyB <=> $difficultyA;
         });
 
         $draft = [];
@@ -1173,7 +1842,7 @@ class PenjadwalankuliahController extends Controller
             $jumlahSks = $this->getJumlahSksByKelasMatkul($kelasMatkul);
             $jumlahMahasiswa = (int) ($kelasMatkul->jumlah_mahasiswa ?? 0);
             $kodeProdi = $kelasMatkul->kode_prodi ?? null;
-            $kodeRombel = $kelasMatkul->kode_rombel ?: (($kelasMatkul->kode_matkul ?? '') . ($kelasMatkul->nama_kelas ?? ''));
+            $kodeRombel = $this->getKodeRombelEfektif($kelasMatkul);
             $kodeDosenList = $this->getKodeDosenListByIdKelas($idKelas);
             $kodeDosenList = array_values(array_unique(array_filter($kodeDosenList)));
 
@@ -1206,10 +1875,8 @@ class PenjadwalankuliahController extends Controller
                 return $scoreA <=> $scoreB;
             });
 
-            if ($aggressive) {
-                $ruangList = array_slice($ruangList, 0, 24);
-            } else {
-                $ruangList = array_slice($ruangList, 0, 15);
+            if (!$aggressive) {
+                $ruangList = array_slice($ruangList, 0, 40);
             }
 
             if ($jenisMatkul === 'praktikum') {
@@ -1235,12 +1902,6 @@ class PenjadwalankuliahController extends Controller
 
             foreach ($urutanHari as $kodeHari) {
                 $listWaktuHari = $this->getWaktuCandidatesByHariAndSks($kodeHari, $jumlahSks);
-                if ($aggressive && count($listWaktuHari) > 32) {
-                    $listWaktuHari = array_slice($listWaktuHari, 0, 32);
-                } elseif (!$aggressive && count($listWaktuHari) > 16) {
-                    $listWaktuHari = array_slice($listWaktuHari, 0, 16);
-                }
-
                 foreach ($listWaktuHari as $waktu) {
                     $wKey = $waktu->kode_hari . '_' . $waktu->kode_jam;
                     if (!isset($seenWaktu[$wKey])) {
@@ -1249,6 +1910,11 @@ class PenjadwalankuliahController extends Controller
                     }
                 }
             }
+
+            // ACAK KESELURUHAN SLOT WAKTU!
+            // Karena kita akan langsung `break` saat menemukan slot kosong (baseScore == 0),
+            // mengacak daftar waktu akan menghasilkan jadwal yang tersebar rata secara instan!
+            shuffle($waktuCandidates);
 
             $bestChromosome = $old;
             $bestCandidate = null;
@@ -1272,12 +1938,7 @@ class PenjadwalankuliahController extends Controller
                 foreach ($ruangList as $ruang) {
                     // Cek kesesuaian tipe ruang
                     $tipeRuang = $ruang->tipe_ruang ?? 'reguler';
-                    $roomMismatch = 0;
-                    if ($jenisMatkul === 'praktikum' && $tipeRuang !== 'laboratorium') {
-                        $roomMismatch = 1;
-                    } elseif ($jenisMatkul === 'teori' && $tipeRuang === 'laboratorium') {
-                        $roomMismatch = 1;
-                    }
+                    $roomMismatch = $this->isTipeRuangSesuai($jenisMatkul, $tipeRuang) ? 0 : 1;
 
                     $isFisikaDasar = $this->isMatkulFisikaDasar($namaMatkul);
                     $isFisikaRuang = $this->isRuangFisika($ruang->nama_ruang);
@@ -1302,9 +1963,13 @@ class PenjadwalankuliahController extends Controller
                         'time_invalid' => $timeInvalid,
                     ];
 
+                    // Gunakan DraftIndex (O(1) lookups) yang super cepat, bukan pencarian O(N)
                     $baseScore = $this->hitungSkorCandidateTerhadapDraftIndex($draftIndex, $candidate);
                     $score = $baseScore;
                     $score += ($hariLoad[$waktu->kode_hari] ?? 0) * 20;
+                    
+                    // Hilangkan hitungSkorKerapatanRuang agar kelas TIDAK mepet-mepet.
+                    // $score += $this->hitungSkorKerapatanRuang($draft, $candidate);
 
                     // Penalty jika 3 SKS tidak di pagi hari
                     if ($jumlahSks == 3 && !$this->isSlotPagi($jamMulai)) {
@@ -1315,18 +1980,23 @@ class PenjadwalankuliahController extends Controller
                         $score += 5;
                     }
 
-                    // Noise kecil untuk mencegah repair selalu memilih slot/ruang yang sama saat banyak kandidat nilainya mirip.
-                    // Nilainya jauh lebih kecil daripada penalty bentrok, jadi kualitas tetap diprioritaskan.
-                    $score += mt_rand(0, $aggressive ? 500 : 1500);
+                    // Noise BANYAK untuk memecah jadwal (scatter) ke semua jam kosong yang tersedia.
+                    // Jadwal akan sepenuhnya tersebar acak (optimal use of time) namun tetap menghindari bentrok.
+                    $score += mt_rand(0, $aggressive ? 25 : 75);
 
                     if ($score < $bestScore) {
                         $bestScore = $score;
                         $bestCandidate = $candidate;
-                        $bestChromosome = [$idKelas, $ruang->kode_ruang, $waktu->kode_hari];
+                        $bestChromosome = [
+                            $idKelas,
+                            $ruang->kode_ruang,
+                            $waktu->kode_hari,
+                            $jamMulai,
+                        ];
 
-                        // Jangan langsung berhenti di kandidat nol pertama. Biarkan kandidat lain ikut bersaing
-                        // supaya hasil akhir tidak selalu identik pada setiap klik generate.
-                        if ($baseScore == 0 && !$aggressive && mt_rand(1, 100) <= 8) {
+                        // KARENA $waktuCandidates SUDAH DIACAK, KANDIDAT PERTAMA YANG KOSONG ADALAH SLOT ACAK!
+                        // Berhenti seketika untuk mendapatkan performa ultra-cepat O(1) dan hindari bentrok!
+                        if ($baseScore == 0) {
                             break 2;
                         }
                     }
@@ -1882,7 +2552,10 @@ class PenjadwalankuliahController extends Controller
 
 
         $algoritma_proses = [];
-        $execution_time = [];
+        $execution_time = $request->session()->get('execution_time', 0);
+        $fixJadwal = $request->session()->get('jadwal');
+        $isFallback = $request->session()->get('isFallback', false);
+        $laporanPengujian = $request->session()->get('laporanPengujian');
 
         return view('penjadwalankuliah.generatejadwal', compact(
             'user_login',
@@ -1893,7 +2566,10 @@ class PenjadwalankuliahController extends Controller
             'allDosen',
             'allHari',
             'countKuliahTabel',
-            'allTahunAjaran'
+            'allTahunAjaran',
+            'fixJadwal',
+            'isFallback',
+            'laporanPengujian'
         ));
     }
 
@@ -2084,7 +2760,7 @@ class PenjadwalankuliahController extends Controller
 
         $ruangTable = DB::table('ruang')->get();
         $waktuTable = []; // Not used anymore
-        
+
         $kodeHariAktifKuliah = $this->getKodeHariAktifKuliah();
         if (count($kodeHariAktifKuliah) == 0) {
             return redirect('/managehari')->with('status', 'Data hari aktif Senin sampai Jumat belum lengkap. Pastikan tabel hari memiliki Senin, Selasa, Rabu, Kamis, dan Jumat.');
@@ -2135,6 +2811,16 @@ class PenjadwalankuliahController extends Controller
             return $allKodeRuang[mt_rand(0, count($allKodeRuang) - 1)];
         };
 
+        $randomJamMulai = function ($kodeHari, $jumlahSks) {
+            $candidates = $this->getWaktuCandidatesByHariAndSks($kodeHari, $jumlahSks);
+            if (count($candidates) == 0) {
+                return $this->jamMulaiSetting;
+            }
+
+            $candidate = $candidates[mt_rand(0, count($candidates) - 1)];
+            return substr((string) $candidate->jam, 0, 5);
+        };
+
         $random_1 = function ($individu) {
             $random = [];
 
@@ -2164,20 +2850,23 @@ class PenjadwalankuliahController extends Controller
             ];
         }
 
-        $individuWithDetail = function ($individu) use ($blockingByDosenHari, $jamMulaiSetting, $durasiSksSetting, $jedaSetting, $istirahatMulaiSetting, $istirahatSelesaiSetting) {
+        $individuWithDetail = function ($individu) use ($blockingByDosenHari, $jamMulaiSetting) {
             $individuWithDetail = [];
 
             for ($i = 0; $i < count($individu); $i++) {
                 $individuWithDetail[$i] = [];
-                $roomDayBuckets = [];
 
                 for ($j = 0; $j < count($individu[$i]); $j++) {
                     $idKelas = $individu[$i][$j][0];
                     $kodeRuang = $individu[$i][$j][1];
                     $kodeHari = $individu[$i][$j][2];
+                    $jamMulai = isset($individu[$i][$j][3])
+                        ? substr((string) $individu[$i][$j][3], 0, 5)
+                        : $jamMulaiSetting;
 
                     $kelasMatkul = $this->getCachedKelasMatkul($idKelas);
                     $kodeDosenList = $this->getKodeDosenListByIdKelas($idKelas);
+                    $kodeDosenList = array_values(array_unique(array_filter($kodeDosenList)));
                     $ruang = $this->getCachedRuang($kodeRuang);
                     $hari = $this->getCachedHari($kodeHari);
 
@@ -2208,8 +2897,8 @@ class PenjadwalankuliahController extends Controller
                                 'clash' => 1
                             ],
                             'kode_hari' => $kodeHari,
-                            'kode_jam' => '07:00',
-                            'jam_mulai' => '07:00',
+                            'kode_jam' => $jamMulai,
+                            'jam_mulai' => $jamMulai,
                             'jenis_matkul' => 'teori'
                         ];
                         continue;
@@ -2222,130 +2911,61 @@ class PenjadwalankuliahController extends Controller
                     $jumlahSks = $matkul ? $matkul->sks : 1;
                     $jenisMatkul = $this->getJenisMatkulByKelasMatkul($kelasMatkul);
                     $namaMatkul = $matkul->nama_matkul ?? $this->getNamaMatkulByKelasMatkul($kelasMatkul);
+                    $jamSelesai = $this->hitungJamSelesai($jamMulai, $jumlahSks);
+                    $isCapacityInvalid = $kelasMatkul->jumlah_mahasiswa > $ruang->kapasitas ? 1 : 0;
+                    $isTimeInvalid = $this->isJamSelesaiValid($jamMulai, $jumlahSks) ? 0 : 1;
 
-                    $key = $kodeRuang . '_' . $kodeHari;
-                    if (!isset($roomDayBuckets[$key])) {
-                        $roomDayBuckets[$key] = [];
+                    $tipeRuang = $ruang->tipe_ruang ?? 'reguler';
+                    $roomTypeMismatch = $this->isTipeRuangSesuai($jenisMatkul, $tipeRuang) ? 0 : 1;
+
+                    $isFisikaDasar = $this->isMatkulFisikaDasar($namaMatkul);
+                    $isFisikaRuang = $this->isRuangFisika($ruang->nama_ruang);
+                    if ($isFisikaDasar && !$isFisikaRuang) {
+                        $roomTypeMismatch = 1;
+                    } elseif (!$isFisikaDasar && $isFisikaRuang) {
+                        $roomTypeMismatch = 1;
                     }
 
-                    $roomDayBuckets[$key][] = [
-                        'j_index' => $j,
-                        'id_kelas' => $idKelas,
-                        'kelasMatkul' => $kelasMatkul,
-                        'kodeDosenList' => $kodeDosenList,
-                        'ruang' => $ruang,
-                        'hari' => $hari,
-                        'jumlahSks' => $jumlahSks,
-                        'jenisMatkul' => $jenisMatkul,
-                        'namaMatkul' => $namaMatkul,
+                    $isBlocked = 0;
+                    if (count($blockingByDosenHari) > 0
+                        && $this->isCandidateBlockedByDosen($kodeDosenList, $hari->kode_hari, $jamMulai, $jamSelesai)) {
+                        $isBlocked = 1;
+                    }
+
+                    $individuWithDetail[$i][$j] = [
+                        'id_kelas' => $kelasMatkul->id_kelas,
+                        'kode_matkul' => $kelasMatkul->kode_matkul,
+                        'kode_dosen' => [
+                            'kode' => $kodeDosenList[0],
+                            'list' => $kodeDosenList,
+                            'clash' => 0,
+                            'blocked' => $isBlocked
+                        ],
+                        'kode_kelas' => $kelasMatkul->id_kelas,
+                        'nama_kelas' => $kelasMatkul->nama_kelas,
+                        'kode_rombel' => $this->getKodeRombelEfektif($kelasMatkul),
+                        'kelas_clash' => 0,
+                        'jumlah_mahasiswa' => $kelasMatkul->jumlah_mahasiswa,
+                        'jumlah_sks' => $jumlahSks,
+                        'jam_selesai' => $jamSelesai,
+                        'time_invalid' => $isTimeInvalid,
+                        'nama_ruang' => [
+                            'kode' => $ruang->nama_ruang,
+                            'kode_ruang' => $ruang->kode_ruang,
+                            'kapasitas' => $ruang->kapasitas,
+                            'capacity_invalid' => $isCapacityInvalid,
+                            'room_type_mismatch' => $roomTypeMismatch,
+                            'clash' => 0
+                        ],
+                        'kode_hari' => $hari->kode_hari,
+                        'kode_jam' => $jamMulai,
+                        'jam_mulai' => $jamMulai,
+                        'jenis_matkul' => $jenisMatkul
                     ];
                 }
 
-                // Process each room-day bucket
-                foreach ($roomDayBuckets as $key => $bucket) {
-                    usort($bucket, function ($a, $b) {
-                        return $a['id_kelas'] <=> $b['id_kelas'];
-                    });
-
-                    $currentJam = $jamMulaiSetting;
-
-                    foreach ($bucket as $item) {
-                        $j = $item['j_index'];
-                        $kelasMatkul = $item['kelasMatkul'];
-                        $ruang = $item['ruang'];
-                        $hari = $item['hari'];
-                        $jumlahSks = $item['jumlahSks'];
-                        $jenisMatkul = $item['jenisMatkul'];
-
-                        $mulaiMinutes = $this->jamToMinutes($currentJam);
-                        $durasiTotal = $jumlahSks * $durasiSksSetting;
-                        $selesaiMinutes = $mulaiMinutes + $durasiTotal;
-
-                        $istirahatMulaiMinutes = $this->jamToMinutes($istirahatMulaiSetting);
-                        $istirahatSelesaiMinutes = $this->jamToMinutes($istirahatSelesaiSetting);
-
-                        if ($mulaiMinutes < $istirahatMulaiMinutes && $selesaiMinutes > $istirahatMulaiMinutes) {
-                            $mulaiMinutes = $istirahatSelesaiMinutes;
-                            $selesaiMinutes = $mulaiMinutes + $durasiTotal;
-                        } elseif ($mulaiMinutes >= $istirahatMulaiMinutes && $mulaiMinutes < $istirahatSelesaiMinutes) {
-                            $mulaiMinutes = $istirahatSelesaiMinutes;
-                            $selesaiMinutes = $mulaiMinutes + $durasiTotal;
-                        }
-
-                        $isCapacityInvalid = $kelasMatkul->jumlah_mahasiswa > $ruang->kapasitas ? 1 : 0;
-                        $batasMulaiMenit = $this->jamToMinutes($this->jamTerakhirSetting);
-                        $isTimeInvalid = 0;
-
-                        if ($mulaiMinutes > $batasMulaiMenit) {
-                            $mulaiMinutes = $batasMulaiMenit + 1;
-                            $selesaiMinutes = $mulaiMinutes + $durasiTotal;
-                            $isTimeInvalid = 1;
-                            $currentJam = $this->minutesToJam($mulaiMinutes);
-                        } else {
-                            $nextMulaiMinutes = $selesaiMinutes + $jedaSetting;
-                            $currentJam = $this->minutesToJam($nextMulaiMinutes);
-                        }
-
-                        $jamMulaiFinal = $this->minutesToJam($mulaiMinutes);
-                        $jamSelesaiFinal = $this->minutesToJam($selesaiMinutes);
-
-                        $tipeRuang = $ruang->tipe_ruang ?? 'reguler';
-                        $roomTypeMismatch = 0;
-                        if ($jenisMatkul === 'praktikum' && $tipeRuang !== 'laboratorium') {
-                            $roomTypeMismatch = 1;
-                        } elseif ($jenisMatkul === 'teori' && $tipeRuang === 'laboratorium') {
-                            $roomTypeMismatch = 1;
-                        }
-
-                        $isFisikaDasar = $this->isMatkulFisikaDasar($item['namaMatkul']);
-                        $isFisikaRuang = $this->isRuangFisika($ruang->nama_ruang);
-                        if ($isFisikaDasar && !$isFisikaRuang) {
-                            $roomTypeMismatch = 1;
-                        } elseif (!$isFisikaDasar && $isFisikaRuang) {
-                            $roomTypeMismatch = 1;
-                        }
-
-                        $isBlocked = 0;
-                        if (count($blockingByDosenHari) > 0) {
-                            if ($this->isCandidateBlockedByDosen($item['kodeDosenList'], $hari->kode_hari, $jamMulaiFinal, $jamSelesaiFinal)) {
-                                $isBlocked = 1;
-                            }
-                        }
-
-                        $individuWithDetail[$i][$j] = [
-                            'id_kelas' => $kelasMatkul->id_kelas,
-                            'kode_matkul' => $kelasMatkul->kode_matkul,
-                            'kode_dosen' => [
-                                'kode' => $item['kodeDosenList'][0],
-                                'list' => $item['kodeDosenList'],
-                                'clash' => 0,
-                                'blocked' => $isBlocked
-                            ],
-                            'kode_kelas' => $kelasMatkul->id_kelas,
-                            'nama_kelas' => $kelasMatkul->nama_kelas,
-                            'kode_rombel' => $kelasMatkul->kode_rombel ?? '-',
-                            'kelas_clash' => 0,
-                            'jumlah_mahasiswa' => $kelasMatkul->jumlah_mahasiswa,
-                            'jumlah_sks' => $jumlahSks,
-                            'jam_selesai' => $jamSelesaiFinal,
-                            'time_invalid' => $isTimeInvalid,
-                            'nama_ruang' => [
-                                'kode' => $ruang->nama_ruang,
-                                'kode_ruang' => $ruang->kode_ruang,
-                                'kapasitas' => $ruang->kapasitas,
-                                'capacity_invalid' => $isCapacityInvalid,
-                                'room_type_mismatch' => $roomTypeMismatch,
-                                'clash' => 0
-                            ],
-                            'kode_hari' => $hari->kode_hari,
-                            'kode_jam' => $jamMulaiFinal,
-                            'jam_mulai' => $jamMulaiFinal,
-                            'jenis_matkul' => $jenisMatkul
-                        ];
-                    }
-                }
-
-                // Check overlaps for Dosen and Rombel
+                // Tandai semua hard conflict dengan interval waktu yang sama persis
+                // dengan interval yang dievaluasi repair operator.
                 $length = count($individuWithDetail[$i]);
                 for ($a = 0; $a < $length; $a++) {
                     if (!isset($individuWithDetail[$i][$a])) {
@@ -2375,6 +2995,11 @@ class PenjadwalankuliahController extends Controller
                         if ($this->isDosenBentrok($rowA['kode_dosen']['list'], $rowB['kode_dosen']['list'])) {
                             $individuWithDetail[$i][$a]['kode_dosen']['clash'] = 1;
                             $individuWithDetail[$i][$b]['kode_dosen']['clash'] = 1;
+                        }
+
+                        if (($rowA['nama_ruang']['kode_ruang'] ?? null) === ($rowB['nama_ruang']['kode_ruang'] ?? null)) {
+                            $individuWithDetail[$i][$a]['nama_ruang']['clash'] = 1;
+                            $individuWithDetail[$i][$b]['nama_ruang']['clash'] = 1;
                         }
 
                         if ($rowA['kode_rombel'] !== '-' && $rowA['kode_rombel'] === $rowB['kode_rombel']) {
@@ -2439,40 +3064,55 @@ class PenjadwalankuliahController extends Controller
             $CD = [];
             $CR = [];
             $CK = [];
+            $hardConflicts = [];
 
             for ($i = 0; $i < count($individuWithDetail); $i++) {
                 $CD[$i] = 0;
                 $CR[$i] = 0;
                 $CK[$i] = 0;
+                $hardConflicts[$i] = 0;
 
                 for ($j = 0; $j < count($individuWithDetail[$i]); $j++) {
+                    if (!empty($individuWithDetail[$i][$j]['is_online'])) {
+                        continue;
+                    }
+
+                    $isHardConflict = false;
+
                     if ($individuWithDetail[$i][$j]['kode_dosen']['clash'] == 1) {
                         $CD[$i] += 300;
+                        $isHardConflict = true;
                     }
 
                     if ($individuWithDetail[$i][$j]['nama_ruang']['clash'] == 1) {
                         $CR[$i] += 300;
+                        $isHardConflict = true;
                     }
 
                     if (($individuWithDetail[$i][$j]['kelas_clash'] ?? 0) == 1) {
                         $CK[$i] += 300;
+                        $isHardConflict = true;
                     }
 
                     if (($individuWithDetail[$i][$j]['kode_dosen']['blocked'] ?? 0) == 1) {
                         $CD[$i] += 300;
+                        $isHardConflict = true;
                     }
 
                     if (($individuWithDetail[$i][$j]['nama_ruang']['capacity_invalid'] ?? 0) == 1) {
                         $CR[$i] += 300;
+                        $isHardConflict = true;
                     }
 
                     if (($individuWithDetail[$i][$j]['time_invalid'] ?? 0) == 1) {
                         $CK[$i] += 150;
+                        $isHardConflict = true;
                     }
 
                     // Penalty jika tipe ruang tidak cocok dengan jenis mata kuliah
                     if (($individuWithDetail[$i][$j]['nama_ruang']['room_type_mismatch'] ?? 0) == 1) {
                         $CR[$i] += 300;
+                        $isHardConflict = true;
                     }
 
                     // Penalty jika praktikum tidak di hari sabtu/minggu (day >= 6), atau teori di weekend
@@ -2481,10 +3121,12 @@ class PenjadwalankuliahController extends Controller
                     if ($jenisMatkulTemp === 'praktikum') {
                         if ($dayTemp < 6) {
                             $CK[$i] += 150;
+                            $isHardConflict = true;
                         }
                     } else {
                         if ($dayTemp >= 6) {
                             $CK[$i] += 150;
+                            $isHardConflict = true;
                         }
                     }
 
@@ -2494,6 +3136,10 @@ class PenjadwalankuliahController extends Controller
                         if ($jamMulaiTemp && !$this->isSlotPagi($jamMulaiTemp)) {
                             $CK[$i] += 300;
                         }
+                    }
+
+                    if ($isHardConflict) {
+                        $hardConflicts[$i]++;
                     }
                 }
 
@@ -2507,6 +3153,7 @@ class PenjadwalankuliahController extends Controller
             $fitness_function["CD"] = $CD;
             $fitness_function["CR"] = $CR;
             $fitness_function["CK"] = $CK;
+            $fitness_function["hard_conflicts"] = $hardConflicts;
 
             $fitnessIndividu = [];
             $total_nilai_fitness = 0;
@@ -2519,7 +3166,9 @@ class PenjadwalankuliahController extends Controller
             $fitness_function["fitness_individu"] = $fitnessIndividu;
             $fitness_function["total_fitness"] = $total_nilai_fitness;
 
-            $hasOne = array_keys($fitnessIndividu, 1);
+            // Solusi layak ditentukan oleh tidak adanya hard constraint.
+            // Penalty sebaran hari dan preferensi 3 SKS tetap menjadi soft constraint.
+            $hasOne = array_keys($hardConflicts, 0);
             $fixJadwal = [];
 
             if ($hasOne) {
@@ -2539,6 +3188,10 @@ class PenjadwalankuliahController extends Controller
 
             for ($i = 0; $i < count($detail); $i++) {
                 for ($j = 0; $j < count($detail[$i]); $j++) {
+                    if (!empty($detail[$i][$j]['is_online'])) {
+                        continue;
+                    }
+
                     if (
                         $detail[$i][$j]["kode_dosen"]["clash"] == 1 ||
                         $detail[$i][$j]["nama_ruang"]["clash"] == 1 ||
@@ -2558,6 +3211,72 @@ class PenjadwalankuliahController extends Controller
             }
 
             return $allClashChromosome;
+        };
+
+        $hitungLaporanKonflik = function (array $jadwal) {
+            $laporan = [
+                'bentrok_dosen' => 0,
+                'bentrok_ruang' => 0,
+                'bentrok_rombel' => 0,
+                'blocking_dosen' => 0,
+                'kapasitas_ruang' => 0,
+                'tipe_ruang' => 0,
+                'batas_waktu' => 0,
+                'aturan_hari' => 0,
+                'total_jadwal_bermasalah' => 0,
+            ];
+
+            foreach ($jadwal as $row) {
+                if (!empty($row['is_online'])) {
+                    continue;
+                }
+
+                $bermasalah = false;
+
+                if (($row['kode_dosen']['clash'] ?? 0) == 1) {
+                    $laporan['bentrok_dosen']++;
+                    $bermasalah = true;
+                }
+                if (($row['nama_ruang']['clash'] ?? 0) == 1) {
+                    $laporan['bentrok_ruang']++;
+                    $bermasalah = true;
+                }
+                if (($row['kelas_clash'] ?? 0) == 1) {
+                    $laporan['bentrok_rombel']++;
+                    $bermasalah = true;
+                }
+                if (($row['kode_dosen']['blocked'] ?? 0) == 1) {
+                    $laporan['blocking_dosen']++;
+                    $bermasalah = true;
+                }
+                if (($row['nama_ruang']['capacity_invalid'] ?? 0) == 1) {
+                    $laporan['kapasitas_ruang']++;
+                    $bermasalah = true;
+                }
+                if (($row['nama_ruang']['room_type_mismatch'] ?? 0) == 1) {
+                    $laporan['tipe_ruang']++;
+                    $bermasalah = true;
+                }
+                if (($row['time_invalid'] ?? 0) == 1) {
+                    $laporan['batas_waktu']++;
+                    $bermasalah = true;
+                }
+
+                $jenis = $row['jenis_matkul'] ?? 'teori';
+                $hari = (int) ($row['kode_hari'] ?? 0);
+                $aturanHariSalah = ($jenis === 'praktikum' && $hari < 6)
+                    || ($jenis !== 'praktikum' && $hari >= 6);
+                if ($aturanHariSalah) {
+                    $laporan['aturan_hari']++;
+                    $bermasalah = true;
+                }
+
+                if ($bermasalah) {
+                    $laporan['total_jadwal_bermasalah']++;
+                }
+            }
+
+            return $laporan;
         };
 
         $individu = [];
@@ -2600,14 +3319,15 @@ class PenjadwalankuliahController extends Controller
                 $individu[$i][] = [
                     $kelasMatkul->id_kelas,
                     $kodeRuang,
-                    $kodeHari
+                    $kodeHari,
+                    $randomJamMulai($kodeHari, $jumlahSksKelas)
                 ];
             }
 
             // Repair awal hanya untuk sebagian populasi.
             // Kalau semua individu langsung direpair, populasi menjadi terlalu mirip dan hasil akhir cenderung sama terus.
-            $jumlahRepairAwal = max(5,(int) ceil($jumlahIndividu * 0.75));
-            if ($i < $jumlahRepairAwal || mt_rand(1, 100) <= 15) {
+            $jumlahRepairAwal = max(5, (int) ceil($jumlahIndividu * 0.9));
+            if ($i < $jumlahRepairAwal || mt_rand(1, 100) <= 30) {
                 $individu[$i] = $this->repairIndividuMinBentrok($individu[$i], $prioritas_kelas, false);
             }
         }
@@ -2617,13 +3337,15 @@ class PenjadwalankuliahController extends Controller
 
         // Target praktis: request diberi ruang lebih panjang sedikit agar repair operator sempat menekan bentrok.
         // Jika fitness sempurna belum ditemukan, sistem mengembalikan individu terbaik hasil GA.
-        $batasWaktuGenerateDetik = 270;
+        $batasWaktuGenerateDetik = 285;
         $berhentiKarenaBatasWaktu = false;
 
         $fixJadwal = [];
         $bestJadwal = [];
         $bestIndividu = [];
         $bestFitness = 0;
+        $fitnessAwalTerbaik = null;
+        $konflikAwalTerbaik = null;
         $isFallback = false;
         $generasi = 0;
         $generasiTanpaPerbaikan = 0;
@@ -2658,6 +3380,13 @@ class PenjadwalankuliahController extends Controller
             $fitnessIndividu = $fitness_function['fitness_individu'];
             $total_nilai_fitness = $fitness_function['total_fitness'];
             $fixJadwal = $fitness_function['fix_jadwal'];
+
+            if ($fitnessAwalTerbaik === null) {
+                $fitnessAwalTerbaik = count($fitnessIndividu) > 0 ? max($fitnessIndividu) : 0;
+                $konflikAwalTerbaik = count($fitness_function['hard_conflicts'] ?? []) > 0
+                    ? min($fitness_function['hard_conflicts'])
+                    : 0;
+            }
 
             $maxFitness = max($fitnessIndividu);
             $bestIndex = array_search($maxFitness, $fitnessIndividu);
@@ -2752,7 +3481,7 @@ class PenjadwalankuliahController extends Controller
                 $algoritma_proses[$generasi]["new_individu_selection"] = $newIndividu;
             }
 
-            $PC = $crossoverRate / 75;
+            $PC = $crossoverRate / 100;
             $indexIndividuSelected = [];
             $random = $random_1($individu);
 
@@ -2910,7 +3639,8 @@ class PenjadwalankuliahController extends Controller
                 $mutatedChro = [
                     $idKelas,
                     $randomKodeRuang($kelasMatkul->kode_prodi, $kelasMatkul->jumlah_mahasiswa, $jenisMatkulMutasi, $namaMatkulMutasi),
-                    $targetKodeHariMutasi
+                    $targetKodeHariMutasi,
+                    $randomJamMulai($targetKodeHariMutasi, $jumlahSksKelas)
                 ];
 
                 if ($simpanProsesAlgoritma && $generasi < $maxProsesDetail) {
@@ -2960,15 +3690,12 @@ class PenjadwalankuliahController extends Controller
                         } else {
                             $kodeHariImm = $kodeHariAktifKuliah[mt_rand(0, count($kodeHariAktifKuliah) - 1)];
                         }
-                        $kodeWaktuImm = $this->randomKodeWaktuValidBySksAndHari($jumlahSksImm, $kodeHariImm);
-                        if (!$kodeWaktuImm) {
-                            continue;
-                        }
                         $namaMatkulImm = $this->getNamaMatkulByKelasMatkul($kelasMatkulImm);
                         $randomChromosomes[] = [
                             $kelasMatkulImm->id_kelas,
                             $randomKodeRuang($kelasMatkulImm->kode_prodi, $kelasMatkulImm->jumlah_mahasiswa, $jenisMatkulImm, $namaMatkulImm),
-                            $kodeWaktuImm
+                            $kodeHariImm,
+                            $randomJamMulai($kodeHariImm, $jumlahSksImm)
                         ];
                     }
                     if (count($randomChromosomes) > 0) {
@@ -2993,32 +3720,30 @@ class PenjadwalankuliahController extends Controller
 
         // Repair final agresif pada individu terbaik hasil GA.
         // Dicoba beberapa kali dengan variasi acak agar sisa bentrok tidak selalu berada pada mata kuliah/ruang/jam yang sama.
-        if (count($bestIndividu) > 0) {
-            $jumlahPercobaanFinalRepair = 50;
+        if (count($bestIndividu) > 0 && count($fixJadwal) == 0) {
+            $jumlahPercobaanFinalRepair = 80;
             $bestFinalFitness = $bestFitness;
             $bestFinalIndividu = $bestIndividu;
             $bestFinalJadwal = $bestJadwal;
             $bestFinalFix = $fixJadwal;
 
             for ($attemptRepair = 0; $attemptRepair < $jumlahPercobaanFinalRepair; $attemptRepair++) {
-                if ((microtime(true) - $time_start) >= ($batasWaktuGenerateDetik + 35)) {
+                if ((microtime(true) - $time_start) >= 295) {
                     break;
                 }
-
-                // Reset cache dosen tiap percobaan final agar pilihan 2 dosen acak dari daftar pengampu bisa berubah.
-                // Ini membantu menghindari bentrok dosen yang terus jatuh pada pasangan dosen yang sama.
-                $this->cacheDosenListByIdKelas = [];
 
                 $candidateIndividu = $this->repairIndividuMinBentrok($bestIndividu, $prioritas_kelas, true);
                 $candidateDetail = $individuWithDetail([$candidateIndividu]);
                 $candidateFitness = $fitness($candidateDetail);
                 $candidateFitnessValue = $candidateFitness['fitness_individu'][0] ?? 0;
+                $candidateHardConflicts = $candidateFitness['hard_conflicts'][0] ?? PHP_INT_MAX;
 
                 if (!isset($candidateDetail[0])) {
                     continue;
                 }
 
                 if (
+                    $candidateHardConflicts == 0 ||
                     $candidateFitnessValue > $bestFinalFitness ||
                     ($candidateFitnessValue == $bestFinalFitness && mt_rand(1, 100) <= 35)
                 ) {
@@ -3030,7 +3755,7 @@ class PenjadwalankuliahController extends Controller
                         : $bestFinalFix;
                 }
 
-                if ($candidateFitnessValue >= 1) {
+                if ($candidateHardConflicts == 0) {
                     break;
                 }
             }
@@ -3041,6 +3766,56 @@ class PenjadwalankuliahController extends Controller
             if (count($bestFinalFix) > 0) {
                 $fixJadwal = $bestFinalFix;
                 $isFallback = false;
+            }
+        }
+
+        // Gerbang validasi final: hasil tidak boleh lolos ke tampilan/session
+        // sebelum seluruh gen memakai kategori ruang yang sesuai.
+        if (count($bestIndividu) > 0) {
+            $strictBestIndividu = $bestIndividu;
+            $strictBestDetail = $individuWithDetail([$strictBestIndividu]);
+            $strictBestFitness = $fitness($strictBestDetail);
+            $strictBestHard = $strictBestFitness['hard_conflicts'][0] ?? PHP_INT_MAX;
+
+            for ($strictAttempt = 0; $strictAttempt < 20; $strictAttempt++) {
+                if ((microtime(true) - $time_start) >= 295) {
+                    break;
+                }
+
+                $candidateIndividu = $this->repairIndividuMinBentrok(
+                    $bestIndividu,
+                    $prioritas_kelas,
+                    true
+                );
+                $candidateDetail = $individuWithDetail([$candidateIndividu]);
+                $candidateFitness = $fitness($candidateDetail);
+                $candidateHard = $candidateFitness['hard_conflicts'][0] ?? PHP_INT_MAX;
+
+                if ($candidateHard < $strictBestHard
+                    || ($candidateHard == $strictBestHard
+                        && ($candidateFitness['fitness_individu'][0] ?? 0)
+                            > ($strictBestFitness['fitness_individu'][0] ?? 0))) {
+                    $strictBestIndividu = $candidateIndividu;
+                    $strictBestDetail = $candidateDetail;
+                    $strictBestFitness = $candidateFitness;
+                    $strictBestHard = $candidateHard;
+                }
+
+                if ($strictBestHard == 0) {
+                    break;
+                }
+            }
+
+            if (isset($strictBestDetail[0])) {
+                $bestIndividu = $strictBestIndividu;
+                $bestJadwal = [$strictBestDetail[0]];
+                $bestFitness = $strictBestFitness['fitness_individu'][0] ?? $bestFitness;
+                if ($strictBestHard == 0) {
+                    $fixJadwal = [$strictBestDetail[0]];
+                    $isFallback = false;
+                } else {
+                    $fixJadwal = [];
+                }
             }
         }
 
@@ -3077,9 +3852,144 @@ class PenjadwalankuliahController extends Controller
         }
 
         if (count($fixJadwalSiapPakai) > 0) {
+            foreach ($fixJadwalSiapPakai as $idxJadwal => $jadwalAlternatif) {
+                $fixJadwalSiapPakai[$idxJadwal] = $this->batasiBentrokRuangKeOnline(
+                    $jadwalAlternatif,
+                    $this->getMaksimalBentrokRuang()
+                );
+            }
+
             Session::put('jadwal', $fixJadwalSiapPakai);
             Session::put('kodeSemester', $kodeSemester);
             Session::put('tahunAjaran', $tahunAjaran);
+        }
+
+        $jadwalUntukLaporan = $fixJadwalSiapPakai[0] ?? [];
+        $jumlahJadwalOnlineOtomatis = 0;
+        foreach ($jadwalUntukLaporan as $rowLaporan) {
+            if (!empty($rowLaporan['is_online'])) {
+                $jumlahJadwalOnlineOtomatis++;
+            }
+        }
+
+        $laporanKonflik = $hitungLaporanKonflik($jadwalUntukLaporan);
+        $evaluasiAkhir = count($jadwalUntukLaporan) > 0
+            ? $fitness([$jadwalUntukLaporan])
+            : ['CD' => [0], 'CR' => [0], 'CK' => [0], 'fitness_individu' => [0]];
+
+        $laporanPengujian = [
+            'seed' => $seed,
+            'jumlah_individu' => $jumlahIndividu,
+            'maksimum_generasi' => $maxGenerasi,
+            'generasi_dijalankan' => min(
+                $maxGenerasi,
+                $generasi + (count($fixJadwalSiapPakai) > 0 ? 1 : 0)
+            ),
+            'crossover_rate' => $crossoverRate,
+            'durasi_sks' => $this->durasiSksSetting,
+            'jeda' => $this->jedaSetting,
+            'jam_mulai' => $this->jamMulaiSetting,
+            'jam_terakhir_mulai' => $this->jamTerakhirSetting,
+            'jumlah_jadwal' => count($jadwalUntukLaporan),
+            'jadwal_online_otomatis' => $jumlahJadwalOnlineOtomatis,
+            'target_maksimal_bentrok_ruang' => $this->getMaksimalBentrokRuang(),
+            'waktu_eksekusi' => round($execution_time, 3),
+            'fitness_awal_terbaik' => $fitnessAwalTerbaik ?? 0,
+            'konflik_awal_terbaik' => $konflikAwalTerbaik ?? 0,
+            'fitness_akhir' => $evaluasiAkhir['fitness_individu'][0] ?? 0,
+            'penalty_cd' => $evaluasiAkhir['CD'][0] ?? 0,
+            'penalty_cr' => $evaluasiAkhir['CR'][0] ?? 0,
+            'penalty_ck' => $evaluasiAkhir['CK'][0] ?? 0,
+            'status' => ($laporanKonflik['total_jadwal_bermasalah'] ?? 0) === 0
+                ? 'Layak tanpa konflik'
+                : 'Belum memenuhi target 0 bentrok. Coba generate ulang atau tambah ruang/waktu kuliah.',
+            'konflik' => $laporanKonflik,
+        ];
+
+        Session::put('execution_time', $execution_time);
+        Session::put('laporanPengujian', $laporanPengujian);
+        Session::put('isFallback', $isFallback);
+
+        // PENTING: variabel yang dikirim ke view harus sama persis dengan data yang
+        // sudah dibatasi dan disimpan ke session. Sebelumnya laporan menghitung
+        // $fixJadwalSiapPakai, tetapi view masih menampilkan $fixJadwal lama.
+        // Akibatnya laporan bisa menulis target tertentu, sementara kartu jadwal yang
+        // tampil masih menunjukkan bentrok lebih banyak. Baris ini membuat laporan,
+        // session, tombol Gunakan Jadwal, dan tampilan grid selalu sinkron.
+        $fixJadwal = $fixJadwalSiapPakai;
+
+        if ($showAlgorithm) {
+            $ringkasanGenerasi = [];
+            foreach ($algoritma_proses as $indexGenerasi => $proses) {
+                if (!is_numeric($indexGenerasi) || !is_array($proses)) {
+                    continue;
+                }
+
+                $fitnessAwal = $proses['fitness_individu'] ?? [];
+                $indexAwalTerbaik = count($fitnessAwal) > 0
+                    ? array_search(max($fitnessAwal), $fitnessAwal)
+                    : null;
+                $fitnessSesudah = $proses['new_fitness_individu'] ?? [];
+                $fitnessGenerasiTerbaik = count($fitnessSesudah) > 0
+                    ? max($fitnessSesudah)
+                    : (count($fitnessAwal) > 0 ? max($fitnessAwal) : 0);
+
+                $ringkasanGenerasi[$indexGenerasi] = [
+                    'generasi' => ((int) $indexGenerasi) + 1,
+                    'jumlah_individu' => count($proses['individu'] ?? []),
+                    'jumlah_kromosom' => isset($proses['individu'][0])
+                        ? count($proses['individu'][0])
+                        : 0,
+                    'fitness_awal_terbaik' => $indexAwalTerbaik !== null
+                        ? ($fitnessAwal[$indexAwalTerbaik] ?? 0)
+                        : 0,
+                    'cd_awal_terbaik' => $indexAwalTerbaik !== null
+                        ? ($proses['CD'][$indexAwalTerbaik] ?? 0)
+                        : 0,
+                    'cr_awal_terbaik' => $indexAwalTerbaik !== null
+                        ? ($proses['CR'][$indexAwalTerbaik] ?? 0)
+                        : 0,
+                    'ck_awal_terbaik' => $indexAwalTerbaik !== null
+                        ? ($proses['CK'][$indexAwalTerbaik] ?? 0)
+                        : 0,
+                    'selection' => [
+                        'metode' => 'Roulette Wheel',
+                        'jumlah_terpilih' => count($proses['list_new_individu_selection'] ?? []),
+                    ],
+                    'crossover' => [
+                        'pc' => $proses['PC'] ?? ($crossoverRate / 100),
+                        'jumlah_parent' => count($proses['parents'] ?? []),
+                        'jumlah_offspring' => count($proses['offSpring'] ?? []),
+                    ],
+                    'mutation' => [
+                        'jumlah_kromosom_bentrok' => count($proses['all_clash_chromosome'] ?? []),
+                        'jumlah_kromosom_dimutasi' => count($proses['mutated_chromosome'] ?? []),
+                    ],
+                    'repair' => [
+                        'operator' => 'Min-Conflict Repair',
+                        'jumlah_individu_repair' => count(array_unique(array_map(function ($row) {
+                            return $row['index_individu'] ?? -1;
+                        }, $proses['all_clash_chromosome'] ?? []))),
+                    ],
+                    'fitness_global_terbaik' => max($bestFitness, $fitnessGenerasiTerbaik),
+                    'status' => count($proses['fix_jadwal'] ?? []) > 0
+                        || count($proses['new_fix_jadwal'] ?? []) > 0
+                        ? 'Solusi tanpa hard conflict ditemukan'
+                        : 'Pencarian dilanjutkan',
+                ];
+            }
+
+            $ringkasanGenerasi['final'] = [
+                'generasi_dijalankan' => $laporanPengujian['generasi_dijalankan'],
+                'fitness_terbaik' => $laporanPengujian['fitness_akhir'],
+                'jumlah_jadwal_ditampilkan' => $laporanPengujian['jumlah_jadwal'],
+                'is_fallback' => $isFallback ? 1 : 0,
+                'catatan' => $laporanPengujian['status']
+                    . '. Total jadwal bermasalah: '
+                    . ($laporanKonflik['total_jadwal_bermasalah'] ?? 0)
+                    . '.',
+            ];
+            $algoritma_proses = $ringkasanGenerasi;
         }
 
         return view('penjadwalankuliah.generatejadwal', compact(
@@ -3095,8 +4005,29 @@ class PenjadwalankuliahController extends Controller
             'allDosen',
             'allHari',
             'countKuliahTabel',
-            'isFallback'
+            'isFallback',
+            'laporanPengujian'
         ));
+    }
+
+    public function pindahJadwalOnline(Request $request, $jadwal_index, $row_index)
+    {
+        $allJadwal = $request->session()->get('jadwal');
+
+        if (!$allJadwal || !isset($allJadwal[$jadwal_index]) || !isset($allJadwal[$jadwal_index][$row_index])) {
+            return redirect('/generatejadwal')->with('status', 'Data jadwal tidak ditemukan. Silakan generate ulang jadwal.');
+        }
+
+        $allJadwal[$jadwal_index][$row_index] = $this->tandaiJadwalSebagaiOnline(
+            $allJadwal[$jadwal_index][$row_index]
+        );
+
+        $allJadwal[$jadwal_index] = $this->refreshConflictFlagsForDisplay($allJadwal[$jadwal_index]);
+
+        Session::put('jadwal', $allJadwal);
+        Session::flash('status', 'Jadwal berhasil dipindahkan ke kolom Jadwal Online.');
+
+        return redirect('/generatejadwal');
     }
 
     public function hasilgenerate(Request $request, $jadwal_index)
@@ -3126,6 +4057,32 @@ class PenjadwalankuliahController extends Controller
         // Jangan membangun ulang jadwal deterministik di sini, supaya hasil yang masuk database
         // tetap sama dengan hasil GA yang ditampilkan pada halaman generate.
         $fixJadwal = $allJadwal[$jadwal_index];
+
+        // Tolak hasil yang tidak memenuhi hard constraint tipe ruang sebelum
+        // jadwal lama dihapus dari database.
+        foreach ($fixJadwal as $row) {
+            if (!empty($row['is_online'])) {
+                continue;
+            }
+
+            $matkulValidasi = DB::table('matkul')
+                ->where('kode_matkul', $row['kode_matkul'] ?? '')
+                ->first();
+            $ruangValidasi = DB::table('ruang')
+                ->where('kode_ruang', $row['nama_ruang']['kode_ruang'] ?? null)
+                ->first();
+
+            if (!$matkulValidasi || !$ruangValidasi
+                || !$this->isTipeRuangSesuai(
+                    $matkulValidasi->jenis_matkul ?? 'teori',
+                    $ruangValidasi->tipe_ruang ?? 'reguler'
+                )) {
+                return redirect('/generatejadwal')->with(
+                    'status',
+                    'Jadwal ditolak karena ditemukan mata kuliah dengan kategori ruang yang tidak sesuai. Silakan generate ulang.'
+                );
+            }
+        }
 
         $jadwalLamaIds = DB::table('jadwal')
             ->where('semester', $nama_semester)
@@ -3166,6 +4123,11 @@ class PenjadwalankuliahController extends Controller
             $kodeDosenGabungan = implode(', ', $kodeDosenList);
 
             $matkulRecord = DB::table('matkul')->where('kode_matkul', $row['kode_matkul'])->first();
+            $isOnline = !empty($row['is_online']);
+            $hariSimpan = $isOnline
+                ? 'Jadwal Online'
+                : DB::table('hari')->where('kode_hari', $row['kode_hari'])->value('nama_hari');
+            $ruangSimpan = $isOnline ? 'Online' : ($row['nama_ruang']['kode'] ?? '-');
 
             $jadwalId = DB::table('jadwal')->insertGetId([
                 'matkul' => $matkulRecord->nama_matkul ?? $row['kode_matkul'],
@@ -3174,8 +4136,8 @@ class PenjadwalankuliahController extends Controller
                 'dosen' => $kodeDosenGabungan,
                 'kelas' => $row['nama_kelas'],
                 'jumlah_sks' => $row['jumlah_sks'],
-                'nama_ruang' => $row['nama_ruang']['kode'],
-                'hari' => DB::table('hari')->where('kode_hari', $row['kode_hari'])->value('nama_hari'),
+                'nama_ruang' => $ruangSimpan,
+                'hari' => $hariSimpan,
                 'jam_masuk' => $jam_masuk,
                 'jam_keluar' => $jam_keluar,
                 'semester' => $nama_semester,
@@ -3210,7 +4172,7 @@ class PenjadwalankuliahController extends Controller
             $jadwal[$i] = DB::table('jadwal')
                 ->where('semester', $semester[$i]->nama_semester)
                 ->orderByDesc('tahun_ajaran')
-                ->orderByRaw("FIELD(LOWER(REPLACE(hari, CHAR(39), '')), 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu')")
+                ->orderByRaw("FIELD(LOWER(REPLACE(hari, CHAR(39), '')), 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu', 'jadwal online')")
                 ->orderBy('jam_masuk')
                 ->orderBy('kelas')
                 ->get();

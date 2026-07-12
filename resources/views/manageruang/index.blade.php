@@ -116,7 +116,7 @@
                       <td scope="row">
                         <form action="/manageruang/{{ $r->kode_ruang }}/edit" method="get" class="d-inline">
                           <button type="submit" class="badge badge-editTheme">
-                            <i class="fas fa-edit"></i>&nbsp;ubah
+                            <i class="fas fa-edit"></i>&nbsp;Ubah
                           </button>
                         </form>
 
@@ -128,7 +128,7 @@
                             class="badge bg-maroon"
                             onclick="return confirm('Yakin ingin menghapus data ini?')"
                           >
-                            <i class="fas fa-trash-alt"></i>&nbsp;delete
+                            <i class="fas fa-trash-alt"></i>&nbsp;Delete
                           </button>
                         </form>
                       </td>

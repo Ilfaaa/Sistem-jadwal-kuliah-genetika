@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'image',
         'role_id',
+        'kode_dosen',
         'password',
     ];
 
@@ -44,4 +45,12 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    /**
+     * Relasi ke tabel dosen.
+     */
+    public function dosen()
+    {
+        return $this->belongsTo(Dosen::class, 'kode_dosen', 'kode_dosen');
+    }
 }

@@ -245,7 +245,7 @@
   }
 
   .jadwal-grid {
-    min-width: 1350px;
+    min-width: 1500px;
     table-layout: fixed;
     font-size: 13px;
     margin-bottom: 0 !important;
@@ -379,6 +379,22 @@
     background: #FED7AA;
   }
 
+  .jadwal-item-online {
+    background: #E9D5FF;
+    border-left-color: #8b5cf6;
+    border-color: #c4b5fd;
+  }
+  .jadwal-item-online .jadwal-matkul {
+    color: #4c1d95;
+  }
+  .jadwal-item-online .jadwal-dosen {
+    color: #6d28d9;
+  }
+
+  .legend-online {
+    background: #E9D5FF;
+  }
+
   .jadwal-matkul {
     font-weight: 700;
     text-transform: capitalize;
@@ -460,7 +476,7 @@
       $finalProses = $algoritma_proses['final'];
   }
 
-  $hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+  $hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu', 'Jadwal Online'];
 
   $daysMap = [];
   foreach (DB::table('hari')->get() as $h) {
@@ -471,6 +487,21 @@
   foreach (DB::table('matkul')->get() as $m) {
       $matkulMap[$m->kode_matkul] = $m;
   }
+
+  $ruangMap = [];
+  foreach (DB::table('ruang')->get() as $r) {
+      $ruangMap[$r->kode_ruang] = $r;
+  }
+
+  $normalJenisMatkul = function ($jenis) {
+      $jenis = strtolower(trim((string) $jenis));
+      return strpos($jenis, 'prakt') !== false ? 'praktikum' : 'teori';
+  };
+
+  $normalTipeRuang = function ($tipe) {
+      $tipe = strtolower(trim((string) $tipe));
+      return strpos($tipe, 'lab') !== false ? 'laboratorium' : 'reguler';
+  };
 
   $jamToMinutes = function ($jam) {
       if (!$jam) {
@@ -540,7 +571,7 @@
                 <label>Jumlah Alternatif Jadwal</label>
                 <select name="individu" class="form-control select2bs4">
                   @foreach(range(4, 50) as $v)
-                    <option value="{{ $v }}">{{ $v }}</option>
+                    <option value="{{ $v }}" {{ $v == 30 ? 'selected' : '' }}>{{ $v }}</option>
                   @endforeach
                 </select>
                 <div class="ga-form-help">
@@ -556,7 +587,7 @@
                 <label>Jumlah Iterasi Pencarian</label>
                 <select name="generasi" class="form-control select2bs4">
                   @foreach(range(10, 500) as $v)
-                    <option value="{{ $v }}">{{ $v }}</option>
+                    <option value="{{ $v }}" {{ $v == 100 ? 'selected' : '' }}>{{ $v }}</option>
                   @endforeach
                 </select>
                 <div class="ga-form-help">
@@ -678,6 +709,95 @@
       </div>
     </div>
 
+    @if(isset($laporanPengujian) && is_array($laporanPengujian))
+      <div class="row mt-4">
+        <div class="col-md-12">
+          <div class="ga-process-card">
+            <div class="ga-process-header">
+              <h4><i class="fas fa-chart-bar mr-2"></i>Laporan Pengujian Algoritma Genetika</h4>
+              <small>Engine ZERO-BENTROK-v5: optimasi final dengan target 0 bentrok. Jadwal yang tidak bisa ditempatkan fisik otomatis masuk Jadwal Online.</small>
+            </div>
+            <div class="ga-process-body">
+              <div class="row mb-3">
+                <div class="col-md-3"><strong>Status:</strong><br>{{ $laporanPengujian['status'] ?? '-' }}</div>
+                <div class="col-md-3"><strong>Fitness awal terbaik:</strong><br>{{ $fmt($laporanPengujian['fitness_awal_terbaik'] ?? null) }}</div>
+                <div class="col-md-3"><strong>Fitness akhir:</strong><br>{{ $fmt($laporanPengujian['fitness_akhir'] ?? null) }}</div>
+                <div class="col-md-3"><strong>Waktu eksekusi:</strong><br>{{ $laporanPengujian['waktu_eksekusi'] ?? '-' }} detik</div>
+              </div>
+
+              <div class="table-responsive mb-3">
+                <table class="table table-bordered table-sm text-center">
+                  <thead class="thead-light">
+                    <tr>
+                      <th>Seed</th>
+                      <th>Populasi</th>
+                      <th>Maks. Generasi</th>
+                      <th>Generasi Dijalankan</th>
+                      <th>Crossover Rate</th>
+                      <th>Jumlah Jadwal</th>
+                      <th>Jadwal Online</th>
+                      <th>Target Bentrok Ruang</th>
+                      <th>Konflik Awal</th>
+                      <th>Konflik Akhir</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{{ $laporanPengujian['seed'] ?? '-' }}</td>
+                      <td>{{ $laporanPengujian['jumlah_individu'] ?? '-' }}</td>
+                      <td>{{ $laporanPengujian['maksimum_generasi'] ?? '-' }}</td>
+                      <td>{{ $laporanPengujian['generasi_dijalankan'] ?? '-' }}</td>
+                      <td>{{ $laporanPengujian['crossover_rate'] ?? '-' }}%</td>
+                      <td>{{ $laporanPengujian['jumlah_jadwal'] ?? '-' }}</td>
+                      <td>{{ $laporanPengujian['jadwal_online_otomatis'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['target_maksimal_bentrok_ruang'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['konflik_awal_terbaik'] ?? '-' }}</td>
+                      <td>{{ $laporanPengujian['konflik']['total_jadwal_bermasalah'] ?? '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-bordered table-sm text-center mb-0">
+                  <thead>
+                    <tr>
+                      <th>Bentrok Dosen</th>
+                      <th>Bentrok Ruang</th>
+                      <th>Bentrok Rombel</th>
+                      <th>Blocking Dosen</th>
+                      <th>Kapasitas</th>
+                      <th>Tipe Ruang</th>
+                      <th>Batas Waktu</th>
+                      <th>Aturan Hari</th>
+                      <th>CD</th>
+                      <th>CR</th>
+                      <th>CK</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{{ $laporanPengujian['konflik']['bentrok_dosen'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['konflik']['bentrok_ruang'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['konflik']['bentrok_rombel'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['konflik']['blocking_dosen'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['konflik']['kapasitas_ruang'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['konflik']['tipe_ruang'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['konflik']['batas_waktu'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['konflik']['aturan_hari'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['penalty_cd'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['penalty_cr'] ?? 0 }}</td>
+                      <td>{{ $laporanPengujian['penalty_ck'] ?? 0 }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    @endif
+
     @if(isset($algoritma_proses) && is_array($algoritma_proses) && count($algoritma_proses) > 0)
       <div class="row mt-4">
         <div class="col-md-12">
@@ -773,9 +893,12 @@
                 <p>Waktu Eksekusi : {{ number_format((float)$execution_time, 2, '.', '') }} Detik</p>
               </div>
 
-              @foreach($fixJadwalSiapPakai as $individu)
+              @foreach($fixJadwalSiapPakai as $indexAlternatif => $individu)
                 @php
-                  $individuRows = collect($individu);
+                  $individuRows = collect($individu)->map(function ($item, $rowIndex) {
+                      $item['_row_index'] = $rowIndex;
+                      return $item;
+                  });
 
                   $individuRows = $individuRows->sortBy(function ($item) use ($jamToMinutes) {
                       $mulai = isset($item['jam_mulai']) ? $item['jam_mulai'] : '00:00';
@@ -817,6 +940,9 @@
                       <span class="jadwal-legend-item">
                         <span class="jadwal-legend-color legend-praktikum"></span> Praktikum
                       </span>
+                      <span class="jadwal-legend-item">
+                        <span class="jadwal-legend-color legend-online"></span> Jadwal Online
+                      </span>
                     </div>
                   </div>
 
@@ -855,7 +981,7 @@
                                 @foreach($hariList as $hari)
                                   @php
                                     $items = $individuRows->filter(function ($item) use ($hari, $jamMasuk, $jamKeluar, $daysMap) {
-                                        $itemHari = $daysMap[$item['kode_hari']] ?? '-';
+                                        $itemHari = !empty($item['is_online']) ? 'Jadwal Online' : ($daysMap[$item['kode_hari']] ?? '-');
                                         $itemMulai = isset($item['jam_mulai']) ? substr((string) $item['jam_mulai'], 0, 5) : '07:00';
                                         $itemKeluar = isset($item['jam_selesai']) ? substr((string) $item['jam_selesai'], 0, 5) : '07:50';
                                         return $itemHari == $hari
@@ -873,10 +999,13 @@
                                       @foreach($items as $item)
                                         @php
                                           $mkRecord = $matkulMap[$item['kode_matkul']] ?? null;
+                                          $isOnline = !empty($item['is_online']);
                                           $jenisItem = strtolower($item['jenis_matkul'] ?? ($mkRecord->jenis_matkul ?? 'teori'));
                                           $tipeItem  = strtolower($mkRecord->tipe_matkul ?? 'wajib');
 
-                                          if ($jenisItem === 'praktikum') {
+                                          if ($isOnline) {
+                                              $warnaClass = 'jadwal-item-online';
+                                          } elseif ($jenisItem === 'praktikum') {
                                               $warnaClass = 'jadwal-item-praktikum';
                                           } elseif ($tipeItem === 'pilihan') {
                                               $warnaClass = 'jadwal-item-pilihan';
@@ -896,8 +1025,22 @@
                                           $isBlocked = ($item['kode_dosen']['blocked'] ?? 0) == 1;
                                           $isRuangClash = ($item['nama_ruang']['clash'] ?? 0) == 1;
                                           $isCapacityInvalid = ($item['nama_ruang']['capacity_invalid'] ?? 0) == 1;
+                                          $kodeRuangItem = $item['nama_ruang']['kode_ruang'] ?? null;
+                                          $ruangRecord = $kodeRuangItem !== null
+                                              ? ($ruangMap[$kodeRuangItem] ?? null)
+                                              : null;
+                                          $jenisAktual = $normalJenisMatkul(
+                                              $mkRecord->jenis_matkul ?? ($item['jenis_matkul'] ?? 'teori')
+                                          );
+                                          $tipeRuangAktual = $normalTipeRuang(
+                                              $ruangRecord->tipe_ruang ?? 'reguler'
+                                          );
+                                          $isRoomTypeMismatch = (($item['nama_ruang']['room_type_mismatch'] ?? 0) == 1)
+                                              || ($jenisAktual === 'teori' && $tipeRuangAktual !== 'reguler')
+                                              || ($jenisAktual === 'praktikum' && $tipeRuangAktual !== 'laboratorium');
                                           $isKelasClash = ($item['kelas_clash'] ?? 0) == 1;
                                           $isTimeInvalid = ($item['time_invalid'] ?? 0) == 1;
+                                          $isBentrok = $isBlocked || $isDosenClash || $isKelasClash || $isRuangClash || $isCapacityInvalid || $isRoomTypeMismatch || $isTimeInvalid;
                                         @endphp
                                         <div class="jadwal-item {{ $warnaClass }}">
                                           <div class="jadwal-matkul">
@@ -913,7 +1056,9 @@
                                             {{ \App\Models\Ruang::formatName($item['nama_ruang']['kode'] ?? '-') }}
                                           </div>
                                           <div class="mt-1 text-center">
-                                            @if($isBlocked)
+                                            @if($isOnline)
+                                              <span class="badge bg-purple">Online</span>
+                                            @elseif($isBlocked)
                                               <span class="badge bg-maroon">Dosen Blocking</span>
                                             @elseif($isDosenClash)
                                               <span class="badge bg-maroon">Bentrok Dosen</span>
@@ -923,10 +1068,21 @@
                                               <span class="badge bg-maroon">Bentrok Ruang</span>
                                             @elseif($isCapacityInvalid)
                                               <span class="badge bg-maroon">Kapasitas Kurang</span>
+                                            @elseif($isRoomTypeMismatch)
+                                              <span class="badge bg-maroon">Tipe Ruang Salah</span>
                                             @elseif($isTimeInvalid)
                                               <span class="badge bg-maroon">Lewat Jam</span>
                                             @else
                                               <span class="badge bg-lime">Valid</span>
+                                            @endif
+
+                                            @if(!$isOnline && $isBentrok)
+                                              <form method="POST" action="{{ route('generatejadwal.pindah-online', ['jadwal_index' => $indexAlternatif, 'row_index' => $item['_row_index']]) }}" class="mt-2">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-primary btn-block">
+                                                  Pindahkan ke Jadwal Online
+                                                </button>
+                                              </form>
                                             @endif
                                           </div>
                                         </div>
@@ -944,7 +1100,7 @@
                             @endif
                           @empty
                             <tr>
-                              <td colspan="8" class="jadwal-empty-message">
+                              <td colspan="9" class="jadwal-empty-message">
                                 Belum ada data jadwal.
                               </td>
                             </tr>
@@ -956,7 +1112,7 @@
 
                   <div class="card-footer">
                     <div class="ga-action-row">
-                      <a href="/hasilgenerate/{{ $loop->index }}" class="btn bg-maroon text-center">
+                      <a href="/hasilgenerate/{{ $indexAlternatif }}" class="btn bg-maroon text-center">
                         <i class="fas fa-table mr-1"></i> Gunakan Jadwal
                       </a>
                     </div>

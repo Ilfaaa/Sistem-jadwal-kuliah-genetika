@@ -86,13 +86,8 @@
                   <th scope="col">NO</th>
                   <th scope="col">Kode Dosen</th>
                   <th scope="col">NIDN / NIP</th>
-                  <th scope="col">Nama</th>
-                  <th scope="col">Program Studi</th>
-                  @if($isAdminOrDosen)
-                  <th scope="col">No. WhatsApp</th>
-                  @else
+                  <th scope="col" style="max-width: 250px; white-space: normal;">Nama</th>
                   <th scope="col">Email</th>
-                  @endif
                   @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
                   <th scope="col">Action</th>
                   @endif
@@ -101,7 +96,7 @@
               <tbody>
                 @if(count($dosen) == 0)
                   <tr>
-                    <td scope="row" colspan="7" class="text-center text-bold text-danger">
+                    <td scope="row" colspan="6" class="text-center text-bold text-danger">
                       Dosen Not Found!
                     </td>
                   </tr>
@@ -112,40 +107,19 @@
                     <td scope="row">{{ $loop->iteration }}</td>
                     <td scope="row">{{ $d->kode_dosen }}</td>
                     <td scope="row">{{ $d->nidn }}</td>
-                    <td scope="row">{{ ucwords($d->nama) }}</td>
-                    <td scope="row">{{ ucwords($d->program_studi) }}</td>
+                    <td scope="row" style="max-width: 250px; white-space: normal;">{{ ucwords($d->nama) }}</td>
                     <td scope="row">
-                      @if($isAdminOrDosen)
-                        @if($d->no_whatsapp)
-                          <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $d->no_whatsapp) }}" target="_blank" class="text-success">
-                            <i class="fab fa-whatsapp"></i> {{ $d->no_whatsapp }}
-                          </a>
-                        @else
-                          <span class="text-muted">-</span>
-                        @endif
+                      @if($d->user && $d->user->email)
+                        <a href="mailto:{{ $d->user->email }}">{{ $d->user->email }}</a>
                       @else
-                        @php
-                          $dosenUser = \DB::table('users')
-                            ->where('role_id', 2)
-                            ->where(function($q) use ($d) {
-                              $q->where('username', $d->kode_dosen)
-                                ->orWhere('username', $d->nidn)
-                                ->orWhere('name', $d->nama);
-                            })
-                            ->first();
-                        @endphp
-                        @if($dosenUser && $dosenUser->email)
-                          <a href="mailto:{{ $dosenUser->email }}">{{ $dosenUser->email }}</a>
-                        @else
-                          <span class="text-muted">-</span>
-                        @endif
+                        <span class="text-muted">-</span>
                       @endif
                     </td>
                     @if(session('user_login') && ($user_login->role_id == 1 || $user_login->role_id == 2))
                     <td scope="row">
                       <form action="/managekuliah/managedosen/{{ $d->kode_dosen }}/edit" method="get" class="d-inline">
                         <button type="submit" class="badge badge-editTheme">
-                          <i class="fas fa-user-edit"></i>&nbsp;ubah
+                          <i class="fas fa-user-edit"></i>&nbsp;Ubah
                         </button>
                       </form>
 
@@ -153,7 +127,7 @@
                         @method('delete')
                         @csrf
                         <button type="submit" class="badge bg-maroon">
-                          <i class="fas fa-user-times"></i>&nbsp;delete
+                          <i class="fas fa-user-times"></i>&nbsp;Delete
                         </button>
                       </form>
                     </td>
